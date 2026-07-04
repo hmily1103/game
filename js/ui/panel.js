@@ -24,6 +24,7 @@ const Panel = {
           <div class="rule-item">
             <div class="rule-item-name">${escapeHtml(rule.name || '未知规则')}</div>
             <div class="rule-item-effect">${escapeHtml(rule.effect || '')}</div>
+            <div class="rule-item-parsed">→ 解析为：${escapeHtml(rule.parsedLabel || '机制规则已启用')}</div>
             <div class="rule-item-effect" style="color: #64748b; margin-top: 4px;">${escapeHtml(rule.impact || '')}</div>
           </div>
         `;
@@ -38,6 +39,15 @@ const Panel = {
 
     if (ruleData.worldVibe) {
       html += `<div style="margin-top: 12px; padding: 8px; background: #0f172a; border-radius: 6px; font-size: 12px; color: #94a3b8; line-height: 1.5;">${escapeHtml(ruleData.worldVibe)}</div>`;
+    }
+
+    if (ruleData.rawJson) {
+      html += `
+        <div class="rule-debug-block">
+          <div class="rule-debug-title">AI 原始 JSON</div>
+          <pre class="rule-raw-json">${escapeHtml(ruleData.rawJson)}</pre>
+        </div>
+      `;
     }
 
     content.innerHTML = html;

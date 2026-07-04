@@ -39,6 +39,11 @@
           <button id="compile-btn" onclick="compileWorld()">编译世界</button>
         </div>
         <p id="compile-status" class="status-text"></p>
+        <div id="post-compile-actions" class="post-compile-actions" style="display:none;">
+          <button id="recompile-btn" class="btn-secondary" onclick="recompileWorld()">🔄 重新编译</button>
+          <button id="start-btn" onclick="beginBattle()">▶ 开始战斗</button>
+        </div>
+        <p id="compile-extra-tip" class="compile-extra-tip"></p>
         <div class="api-config">
           <div class="api-config-header" onclick="toggleApiConfig()">
             <span id="api-config-toggle">▸</span>

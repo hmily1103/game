@@ -21,7 +21,9 @@ const Compiler = {
     // 如果没有配置 API，直接走离线兜底
     if (!this.apiUrl || !this.apiKey) {
       console.log('[Compiler] 未配置 API，使用离线兜底');
-      return FallbackRules.match(input);
+      const fallback = FallbackRules.match(input);
+      fallback.rawJson = '';
+      return fallback;
     }
 
     try {
@@ -67,6 +69,7 @@ const Compiler = {
       }
 
       ruleData.source = 'AI 生成';
+      ruleData.rawJson = jsonStr;
       console.log('[Compiler] AI 生成成功', ruleData);
       return ruleData;
 
@@ -74,6 +77,7 @@ const Compiler = {
       console.warn('[Compiler] AI 调用失败，降级到离线兜底:', err.message);
       const fallback = FallbackRules.match(input);
       fallback.source = '本地兜底（AI 降级）';
+      fallback.rawJson = '';
       return fallback;
     }
   },

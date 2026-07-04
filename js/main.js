@@ -12,6 +12,8 @@ const Game = {
   lastTime: 0,
   frameCount: 0,
   startTime: 0,
+  lastInput: '',
+  pendingRuleData: null,
   totalKills: 0,
   productTriggers: 0,  // 需求变更次数
   devTriggers: 0,      // 研发写Bug次数
@@ -248,9 +250,76 @@ function restoreApiConfig() {
   }
 }
 
-async function compileWorld() {
-  const input = document.getElementById('world-input').value.trim();
-  const btn = document.getElementById('compile-btn');
+function setCompileControlsBusy(isBusy, buttonText) {
+  const compileBtn = document.getElementById('compile-btn');
+  const recompileBtn = document.getElementById('recompile-btn');
+  const startBtn = document.getElementById('start-btn');
+
+  compileBtn.disabled = isBusy;
+  compileBtn.textContent = isBusy ? buttonText : '编译世界';
+
+  if (recompileBtn) recompileBtn.disabled = isBusy;
+  if (startBtn) startBtn.disabled = isBusy || !Game.pendingRuleData;
+}
+
+function togglePostCompileActions(show) {
+  const actions = document.getElementById('post-compile-actions');
+  if (actions) {
+    actions.style.display = show ? 'flex' : 'none';
+  }
+}
+
+function updateCompileExtraTip(ruleData) {
+  const tip = document.getElementById('compile-extra-tip');
+  if (!tip) return;
+
+  if (!ruleData) {
+    tip.textContent = '';
+    return;
+  }
+
+  if (ruleData.rawJson) {
+    tip.textContent = '你可以点击“重新编译”对比同一句输入在 AI 模型下生成的不同规则。';
+    tip.style.color = '#64748b';
+    return;
+  }
+
+  tip.textContent = '当前使用离线规则包：同一句输入会命中固定规则，配置 API 后可看到真正的 AI 重编译差异。';
+  tip.style.color = '#fbbf24';
+}
+
+function renderCompileStatus(ruleData) {
+  const status = document.getElementById('compile-status');
+  status.textContent = '';
+  status.style.color = '#4ade80';
+
+  if (!ruleData || !ruleData.isHidden) {
+    status.textContent = '世界编译完成！可以先看规则，再决定是否开打。';
+    return;
+  }
+
+  status.appendChild(document.createTextNode('✨ 触发隐藏规则：'));
+  const worldName = document.createElement('b');
+  worldName.style.color = '#a78bfa';
+  worldName.textContent = ruleData.worldName || '未知世界';
+  status.appendChild(worldName);
+  status.appendChild(document.createTextNode(' ✨'));
+}
+
+function applyCompiledWorld(input, ruleData) {
+  Game.lastInput = input;
+  Game.pendingRuleData = ruleData;
+
+  renderCompileStatus(ruleData);
+  RuleEngine.applyRules(ruleData);
+  Panel.update(ruleData);
+  togglePostCompileActions(true);
+  updateCompileExtraTip(ruleData);
+  setCompileControlsBusy(false, '编译世界');
+}
+
+async function compileWorld(options = {}) {
+  const input = (options.inputOverride || document.getElementById('world-input').value).trim();
   const status = document.getElementById('compile-status');
 
   if (!input) {
@@ -259,42 +328,47 @@ async function compileWorld() {
     return;
   }
 
-  btn.disabled = true;
-  btn.textContent = '编译中...';
+  status.textContent = '';
+  setCompileControlsBusy(true, options.fastMode ? '重编译中...' : '编译中...');
 
   // 启动世界编译动画
   showCompileAnimation(input, (ruleData) => {
     if (ruleData) {
-      status.textContent = '世界编译完成！';
-      status.style.color = '#4ade80';
-
-      // 隐藏规则彩蛋提示
-      if (ruleData.isHidden) {
-        status.innerHTML = '✨ 触发隐藏规则：<b style="color:#a78bfa">' + ruleData.worldName + '</b> ✨';
-      }
-
-      RuleEngine.applyRules(ruleData);
-      Panel.update(ruleData);
-
-      setTimeout(() => {
-        startGame();
-      }, 500);
+      applyCompiledWorld(input, ruleData);
     } else {
       status.textContent = '编译失败，请重试';
       status.style.color = '#f87171';
-      btn.disabled = false;
-      btn.textContent = '编译世界';
+      setCompileControlsBusy(false, '编译世界');
     }
-  });
+  }, options);
+}
+
+function recompileWorld() {
+  if (!Game.lastInput) return;
+  compileWorld({ fastMode: true, inputOverride: Game.lastInput });
+}
+
+function beginBattle() {
+  const status = document.getElementById('compile-status');
+  if (!Game.pendingRuleData) {
+    status.textContent = '请先编译一个世界规则包';
+    status.style.color = '#f87171';
+    return;
+  }
+
+  startGame();
 }
 
 // ========== 世界编译动画 ==========
 
-function showCompileAnimation(input, callback) {
+function showCompileAnimation(input, callback, options = {}) {
   const overlay = document.getElementById('compile-overlay');
   const linesDiv = document.getElementById('compile-lines');
   const bar = document.getElementById('compile-bar');
   const percentDiv = document.getElementById('compile-percent');
+  const speedMultiplier = options.fastMode ? 0.35 : 1;
+  const finalWait = Math.round(1800 * speedMultiplier);
+  const closeDelay = options.fastMode ? 300 : 800;
 
   overlay.style.display = 'flex';
   linesDiv.innerHTML = '';
@@ -304,11 +378,11 @@ function showCompileAnimation(input, callback) {
   // 编译步骤文案 — 仪式感
   const steps = [
     { text: '> 解析项目黑话...', delay: 0 },
-    { text: '> 识别关键词："' + input + '"', delay: 300 },
-    { text: '> 召唤产品行为模型...', delay: 600 },
-    { text: '> 注入研发失控模块...', delay: 900 },
-    { text: '> 计算屎山增长曲线...', delay: 1200 },
-    { text: '> 生成世界规则...', delay: 1500 },
+    { text: '> 识别关键词："' + input + '"', delay: Math.round(300 * speedMultiplier) },
+    { text: '> 召唤产品行为模型...', delay: Math.round(600 * speedMultiplier) },
+    { text: '> 注入研发失控模块...', delay: Math.round(900 * speedMultiplier) },
+    { text: '> 计算屎山增长曲线...', delay: Math.round(1200 * speedMultiplier) },
+    { text: '> 生成世界规则...', delay: Math.round(1500 * speedMultiplier) },
   ];
 
   // 逐行显示
@@ -371,8 +445,8 @@ function showCompileAnimation(input, callback) {
     setTimeout(() => {
       overlay.style.display = 'none';
       callback(ruleData);
-    }, 800);
-  }, 1800);
+    }, closeDelay);
+  }, finalWait);
 }
 
 // ========== 战场引导提示 ==========
@@ -750,13 +824,11 @@ function restartGame() {
   document.getElementById('world-input').value = '';
   document.getElementById('compile-status').textContent = '';
   document.getElementById('compile-status').style.color = '';
+  document.getElementById('compile-extra-tip').textContent = '';
+  togglePostCompileActions(false);
 
   // 3. 重置编译按钮状态（关键！防止卡在"编译中"）
-  const btn = document.getElementById('compile-btn');
-  if (btn) {
-    btn.disabled = false;
-    btn.textContent = '编译世界';
-  }
+  setCompileControlsBusy(false, '编译世界');
 
   // 4. 隐藏编译动画 overlay（防止动画卡住）
   const overlay = document.getElementById('compile-overlay');
@@ -767,6 +839,8 @@ function restartGame() {
   // 5. 重置游戏状态
   Game.state = 'input';
   Game.victory = false;
+  Game.lastInput = '';
+  Game.pendingRuleData = null;
 
   // 6. 重置规则引擎
   RuleEngine.init();

@@ -19,7 +19,6 @@ const Bomb = {
       gridY: y,
       timer: RuleEngine.config.bombTimer * 60,
       exploded: false,
-      fireCells: [],
     });
   },
 
@@ -40,7 +39,7 @@ const Bomb = {
       }
     }
 
-    this.list = this.list.filter(b => !b.exploded || b.fireCells.length > 0);
+    this.list = this.list.filter(b => !b.exploded);
   },
 
   explode(bomb) {
@@ -114,10 +113,6 @@ const Bomb = {
     }
 
     Player.activeBombs = Math.max(0, Player.activeBombs - 1);
-
-    setTimeout(() => {
-      bomb.fireCells = [];
-    }, fireDuration * (1000 / 60));
   },
 
   addFire(x, y, duration) {

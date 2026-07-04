@@ -183,7 +183,8 @@ body {
   color: #475569;
 }
 
-#compile-btn {
+#compile-btn,
+#start-btn {
   background: linear-gradient(135deg, #4ade80, #22c55e);
   color: #0f172a;
   border: none;
@@ -197,18 +198,61 @@ body {
   box-shadow: 0 4px 12px rgba(74, 222, 128, 0.3);
 }
 
-#compile-btn:hover {
+#compile-btn:hover,
+#start-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(74, 222, 128, 0.4);
 }
 
-#compile-btn:active {
+#compile-btn:active,
+#start-btn:active {
   transform: translateY(0);
 }
 
-#compile-btn:disabled {
+#compile-btn:disabled,
+#start-btn:disabled {
   background: #475569;
   color: #94a3b8;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.post-compile-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.btn-secondary {
+  background: #1e293b;
+  color: #cbd5e1;
+  border: 1px solid #475569;
+  padding: 12px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  transform: translateY(-2px);
+  border-color: #22d3ee;
+  color: #22d3ee;
+  box-shadow: 0 6px 20px rgba(34, 211, 238, 0.15);
+}
+
+.btn-secondary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary:disabled {
+  background: #0f172a;
+  color: #64748b;
+  border-color: #334155;
   cursor: not-allowed;
   box-shadow: none;
   transform: none;
@@ -219,6 +263,13 @@ body {
   font-size: 13px;
   color: #94a3b8;
   min-height: 18px;
+}
+
+.compile-extra-tip {
+  margin-top: 8px;
+  min-height: 18px;
+  font-size: 12px;
+  color: #64748b;
 }
 
 /* API 配置区域 */
@@ -543,6 +594,38 @@ body {
   font-size: 12px;
   color: #94a3b8;
   line-height: 1.5;
+}
+
+.rule-item-parsed {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #22d3ee;
+}
+
+.rule-debug-block {
+  margin-top: 12px;
+  padding: 10px;
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+}
+
+.rule-debug-title {
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.5px;
+}
+
+.rule-raw-json {
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #cbd5e1;
 }
 
 .rule-source {
