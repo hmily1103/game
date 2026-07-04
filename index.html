@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BugBoomer — AI 编译你的测试部世界</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/ui.css">
+  <link rel="stylesheet" href="css/crt.css">
+</head>
+<body>
+  <div id="app">
+    <!-- 开场动画 -->
+    <div id="intro-screen" class="screen active">
+      <canvas id="intro-canvas" width="600" height="480"></canvas>
+      <div id="intro-start-hint" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;z-index:10;cursor:pointer;">
+        <div style="font-size:18px;color:#4ade80;font-family:'Courier New',monospace;text-shadow:0 0 10px rgba(74,222,128,0.5);margin-bottom:8px;">▶ 点击开始</div>
+        <div style="font-size:11px;color:#64748b;font-family:'Courier New',monospace;">需点击激活音效</div>
+      </div>
+    </div>
+
+    <!-- 开局输入界面 -->
+    <div id="input-screen" class="screen">
+      <div class="title-block">
+        <h1 class="game-title">BugBoomer</h1>
+        <p class="game-subtitle">AI 编译你的测试部世界</p>
+      </div>
+      <div class="input-block">
+        <p class="input-hint">用一句话描述你的项目状态，AI 将编译出世界规则</p>
+        <div class="example-tags">
+          <span class="tag" onclick="quickInput('项目太乱')">项目太乱</span>
+          <span class="tag" onclick="quickInput('敏捷开发')">敏捷开发</span>
+          <span class="tag" onclick="quickInput('996')">996</span>
+          <span class="tag" onclick="quickInput('屎山重构')">屎山重构</span>
+          <span class="tag" onclick="quickInput('需求天天变')">需求天天变</span>
+        </div>
+        <div class="input-row">
+          <input type="text" id="world-input" placeholder="输入一句话..." maxlength="50">
+          <button id="compile-btn" onclick="compileWorld()">编译世界</button>
+        </div>
+        <p id="compile-status" class="status-text"></p>
+        <div class="api-config">
+          <div class="api-config-header" onclick="toggleApiConfig()">
+            <span id="api-config-toggle">▸</span>
+            <span id="api-status-label">AI 接口：未配置（使用离线规则）</span>
+          </div>
+          <div id="api-config-body" class="api-config-body" style="display:none;">
+            <div class="api-field">
+              <label>API 地址</label>
+              <input type="text" id="api-url" placeholder="https://api.deepseek.com/v1/chat/completions">
+            </div>
+            <div class="api-field">
+              <label>API Key</label>
+              <input type="password" id="api-key" placeholder="sk-...">
+            </div>
+            <div class="api-field">
+              <label>模型</label>
+              <input type="text" id="api-model" placeholder="deepseek-chat">
+            </div>
+            <div class="api-actions">
+              <button id="api-save-btn" onclick="saveApiConfig()">保存配置</button>
+              <button id="api-clear-btn" onclick="clearApiConfig()">清除</button>
+            </div>
+            <p class="api-tip">支持 OpenAI / DeepSeek 等兼容接口。配置后输入任意一句话即可由 AI 实时生成世界规则。</p>
+          </div>
+        </div>
+        <div class="input-footer">
+          <span class="tip">操作：WASD 移动 | 空格放炸弹 | 炸💩屎山 + 杀🟢Bug = 通关</span><br>
+          <span class="tip">产品改需求复活屎山 | 研发持续写Bug | 🍗鸡腿补血 🧋奶茶护盾 ⚡加速器</span><br>
+          <span class="tip">👻幽灵Bug穿墙 | 💥死机Bug倒计时爆炸 | 🔥P0要炸两次</span><br>
+          <span class="tip" style="color:#a78bfa">✨ 试试组合输入如"996项目太乱"触发隐藏规则...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 世界编译动画 -->
+    <div id="compile-overlay" class="compile-overlay" style="display:none;">
+      <div class="compile-terminal">
+        <div class="compile-header">⚙ AI 世界编译器</div>
+        <div id="compile-lines" class="compile-lines"></div>
+        <div class="compile-bar-wrapper">
+          <div id="compile-bar" class="compile-bar"></div>
+        </div>
+        <div id="compile-percent" class="compile-percent">0%</div>
+      </div>
+    </div>
+
+    <!-- 游戏画面 -->
+    <div id="game-screen" class="screen">
+      <div class="game-wrapper">
+        <div class="game-left">
+          <div class="hud">
+            <div class="hud-item">
+              <span class="hud-icon">❤️</span>
+              <span id="lives">3</span>
+            </div>
+            <div class="hud-item">
+              <span class="hud-icon">🟢</span>
+              <span id="bug-count">0</span>
+            </div>
+            <div class="hud-item">
+              <span class="hud-icon">💩</span>
+              <span id="clear-rate">0%</span>
+            </div>
+            <div class="hud-item" id="speed-hud" style="display:none;">
+              <span class="hud-icon">⚡</span>
+              <span id="speed-timer">10</span>
+            </div>
+          </div>
+          <div class="canvas-container">
+            <canvas id="game-canvas" width="1092" height="1092" style="width:546px;height:546px;"></canvas>
+            <div class="crt-overlay"></div>
+          </div>
+          <div id="banner-area"></div>
+          <div id="battle-hint" class="battle-hint"></div>
+          <div id="roast-bubble" class="roast-bubble"></div>
+        </div>
+        <div class="game-right">
+          <div id="rule-panel" class="rule-panel">
+            <div class="panel-header">WORLD RULE ENGINE</div>
+            <div id="rule-content" class="rule-content">
+              <p class="rule-placeholder">等待世界编译...</p>
+            </div>
+          </div>
+          <div id="danmaku-area" class="danmaku-area"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 过关/失败界面 -->
+    <div id="end-screen" class="screen">
+      <h1 id="end-title"></h1>
+      <p id="end-message"></p>
+      <div id="end-stats" class="end-stats"></div>
+      <button onclick="restartGame()">再来一局</button>
+    </div>
+  </div>
+
+  <!-- 脚本加载 -->
+  <script src="js/engine/map.js"></script>
+  <script src="js/engine/player.js"></script>
+  <script src="js/engine/pickup.js"></script>
+  <script src="js/engine/bomb.js"></script>
+  <script src="js/engine/enemy.js"></script>
+  <script src="js/engine/collision.js"></script>
+  <script src="js/systems/product.js"></script>
+  <script src="js/systems/developer.js"></script>
+  <script src="js/systems/shishan.js"></script>
+  <script src="js/systems/rules.js"></script>
+  <script src="js/ai/fallback.js"></script>
+  <script src="js/ai/prompt.js"></script>
+  <script src="js/ai/compiler.js"></script>
+  <script src="js/ui/render.js"></script>
+  <script src="js/ui/panel.js"></script>
+  <script src="js/ui/effects.js"></script>
+  <script src="js/ui/danmaku.js"></script>
+  <script src="js/ui/roast.js"></script>
+  <script src="js/ui/hud.js"></script>
+  <script src="js/audio/sound.js"></script>
+  <script src="js/ui/intro.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
