@@ -73,11 +73,17 @@ const Enemy = {
       if (!pos) return;
       const dist = Math.abs(pos.x - Player.gridX) + Math.abs(pos.y - Player.gridY);
       if (dist < 4) {
+        let found = false;
         for (let attempt = 0; attempt < 10; attempt++) {
           pos = GameMap.getRandomEmptyCell();
           if (!pos) return;
-          if (Math.abs(pos.x - Player.gridX) + Math.abs(pos.y - Player.gridY) >= 4) break;
+          if (Math.abs(pos.x - Player.gridX) + Math.abs(pos.y - Player.gridY) >= 4) {
+            found = true;
+            break;
+          }
         }
+        // 10次后仍不够远，放弃生成（不要刷在玩家脸上）
+        if (!found) return;
       }
     }
 
@@ -212,7 +218,7 @@ const Enemy = {
       // P0 击杀掉落血包概率更高
       if (e.type === 'p0') {
         Pickup.tryDrop(e.gridX, e.gridY);
-        Pickup.dropChance = 0.18; // 重置
+        // 不在此处硬编码重置 dropChance，由 Pickup.init() 统一管理
       }
 
     } else {
@@ -222,8 +228,8 @@ const Enemy = {
       Danmaku.show('kill');
       Sound.play('kill');
 
-      // 杀Bug后有40%概率在Bug位置生成屎山 — "改Bug产生新屎山"
-      if (Math.random() < 0.4) {
+      // 杀Bug后有20%概率在Bug位置生成屎山 — "改Bug产生新屎山"
+      if (Math.random() < 0.2) {
         if (GameMap.spawnShishanAt(e.gridX, e.gridY)) {
           Effects.particle(
             e.gridX * CELL_SIZE + CELL_SIZE/2,

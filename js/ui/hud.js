@@ -17,6 +17,16 @@ const HUD = {
       }
     }
 
+    // 最后一条命 — 全屏红灯警告
+    const canvasContainer = document.querySelector('.canvas-container');
+    if (canvasContainer) {
+      if (Player.lives === 1 && !Player.dead) {
+        canvasContainer.classList.add('danger');
+      } else {
+        canvasContainer.classList.remove('danger');
+      }
+    }
+
     if (bugCount) {
       const count = Enemy.count();
       if (parseInt(bugCount.textContent) !== count) {

@@ -105,6 +105,13 @@ const Renderer = {
     ctx.fillStyle = '#141428';
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
+    // 每帧重置 Canvas 状态，防止上一帧泄漏
+    ctx.globalAlpha = 1;
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'miter';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+
     // 绘制地板棋盘
     this.drawFloor();
 
@@ -126,11 +133,6 @@ const Renderer = {
     // 绘制玩家
     this.drawPlayer();
 
-    // 黑暗地图效果
-    if (RuleEngine.config.darkMap) {
-      this.drawDarkness();
-    }
-
     // 绘制粒子
     this.drawParticles();
 
@@ -139,6 +141,11 @@ const Renderer = {
 
     // 绘制屎山飞射碎片
     Effects.drawFlyingPoops(ctx);
+
+    // 黑暗地图效果 — 放在最后，遮住视野外的粒子/特效
+    if (RuleEngine.config.darkMap) {
+      this.drawDarkness();
+    }
 
     // 世界氛围暗角 — 不同世界不同色调
     if (this.worldTheme.vignette) {
@@ -713,6 +720,7 @@ const Renderer = {
     ctx.fill();
 
     // 幽灵两只手 — 飘动
+    ctx.save();
     ctx.fillStyle = '#a78bfa';
     ctx.globalAlpha *= 0.8;
     ctx.beginPath();
@@ -721,7 +729,7 @@ const Renderer = {
     ctx.beginPath();
     ctx.arc(cx + 14 * S, cy + 2 * S - wobble, 4 * S, 0, Math.PI * 2);
     ctx.fill();
-    ctx.globalAlpha /= 0.8;
+    ctx.restore();
 
     // 眼睛 — 白色空洞
     ctx.fillStyle = '#fff';
@@ -1344,21 +1352,16 @@ const Renderer = {
     const cs = CELL_SIZE * S;
     const px = Player.pixelX * S + cs / 2;
     const py = Player.pixelY * S + cs / 2;
-    const radius = cs * 2.5;
+    const radius = cs * 3.5;  // 视野半径（2.5→3.5格，更舒适）
 
     ctx.save();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.92)';
-    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-    ctx.globalCompositeOperation = 'destination-out';
-    const gradient = ctx.createRadialGradient(px, py, 0, px, py, radius);
-    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-    gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.8)');
-    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    // 径向渐变遮罩：中心透明（看得到游戏），边缘深黑（看不到远处）
+    const gradient = ctx.createRadialGradient(px, py, radius * 0.3, px, py, radius);
+    gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    gradient.addColorStop(0.6, 'rgba(0, 0, 0, 0.15)');
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0.88)');
     ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.arc(px, py, radius, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.restore();
   },
 

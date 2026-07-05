@@ -13,14 +13,16 @@ const GameMap = {
   grid: [],
   initialShishanCount: 0,
   destroyedShishan: 0,
-  totalShishanEver: 0,  // 所有曾出现的屎山（初始+复活+生成），用于清除率分母
-  maxShishan: 35,  // 屎山总量上限，防止地图被填满
+  totalShishanEver: 0,  // 所有曾出现的屎山（统计用）
+  productRespawnCount: 0,  // 产品复活屎山数（计入清除率分母）
+  maxShishan: 25,  // 屎山总量上限，防止地图被填满
 
   init() {
     this.grid = [];
     this.destroyedShishan = 0;
     this.initialShishanCount = 0;
     this.totalShishanEver = 0;
+    this.productRespawnCount = 0;
 
     // 第一步：全部初始化为空地，边界设为硬墙
     for (let y = 0; y < GRID_SIZE; y++) {
@@ -94,10 +96,10 @@ const GameMap = {
     // 第三步：验证连通性，修复孤岛
     this.ensureConnectivity();
 
-    // 第四步：随机生成屎山（15% 概率，减少初始量，主要靠杀Bug后生成）
+    // 第四步：随机生成屎山（12% 概率，减少初始量，主要靠杀Bug后生成）
     for (let y = 1; y < GRID_SIZE - 1; y++) {
       for (let x = 1; x < GRID_SIZE - 1; x++) {
-        if (this.grid[y][x] === TILE.EMPTY && Math.random() < 0.15) {
+        if (this.grid[y][x] === TILE.EMPTY && Math.random() < 0.12) {
           this.grid[y][x] = TILE.SHISHAN;
           this.initialShishanCount++;
         }
@@ -235,7 +237,8 @@ const GameMap = {
   respawnShishan(x, y) {
     if (this.get(x, y) === TILE.EMPTY && this.countShishan() < this.maxShishan) {
       this.set(x, y, TILE.SHISHAN);
-      this.totalShishanEver++;  // 复活也计入总屎山数
+      this.totalShishanEver++;
+      this.productRespawnCount++;  // 产品复活计入清除率分母
       return true;
     }
     return false;
@@ -286,9 +289,11 @@ const GameMap = {
   },
 
   getClearRate() {
-    // 分母用 totalShishanEver（初始+复活+杀Bug生成），避免清除率虚高
-    if (this.totalShishanEver === 0) return 0;
-    return Math.min(1, this.destroyedShishan / this.totalShishanEver);
+    // 分母用 initialShishanCount + 产品复活的屎山数
+    // 杀Bug生成的屎山不计入分母（它是惩罚机制，不应拉低清除率）
+    const denominator = this.initialShishanCount + this.productRespawnCount;
+    if (denominator === 0) return 1;
+    return Math.min(1, this.destroyedShishan / denominator);
   },
 
   // 找一个空地随机位置（用于生成 Bug 怪等）

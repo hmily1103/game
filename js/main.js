@@ -490,9 +490,8 @@ function startGame() {
   if (RuleEngine.config.oneLife) {
     Player.lives = 1;
   }
-  if (RuleEngine.config.doubleBomb) {
-    Player.maxBombs = 2;
-  }
+  // 默认2个炸弹（doubleBomb规则可进一步确认）
+  Player.maxBombs = RuleEngine.config.doubleBomb ? 2 : 2;
   Player.setSpeed(RuleEngine.config.playerSpeed);
 
   if (!Sound.ctx) {
@@ -529,6 +528,9 @@ function startGame() {
   Game.state = 'playing';
   Game.lastTime = performance.now();
 
+  // 开局规则警告 — 检测到危险规则时全屏提示
+  Effects.showRuleWarning();
+
   requestAnimationFrame(gameLoop);
 }
 
@@ -536,7 +538,7 @@ function startGame() {
 
 function gameLoop(timestamp) {
   if (Game.state !== 'playing') {
-    checkEndState();
+    // 非游戏中状态直接停止循环
     return;
   }
 
@@ -605,9 +607,6 @@ function checkWinCondition() {
     Game.state = 'won';
     showEndScreen(true);
   }
-}
-
-function checkEndState() {
 }
 
 // ========== 特殊 Bug 定时生成 ==========
@@ -688,6 +687,9 @@ function showEndScreen(won) {
   const clearRate = Math.floor(GameMap.getClearRate() * 100);
   const bugsKilled = Enemy.spawnCount - Enemy.count();
   const worldName = RuleEngine.currentRules ? RuleEngine.currentRules.worldName : '未知';
+  // 安全转义 — 防止 AI 返回恶意 HTML
+  const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+  const safeWorldName = esc(worldName);
 
   if (won) {
     const victoryMsgs = [
@@ -744,7 +746,7 @@ function showEndScreen(won) {
       </div>
       <div style="width:100%;margin-top:12px;padding:12px;background:#0f172a;border-radius:8px;font-size:13px;color:#94a3b8;line-height:1.8;text-align:left;">
         <div style="color:#4ade80;font-weight:700;margin-bottom:6px;">📋 \u6218\u62A5</div>
-        \u4E16\u754C\uFF1A${worldName}<br>
+        \u4E16\u754C\uFF1A${safeWorldName}<br>
         \u7814\u53D1\u5199Bug\u6B21\u6570\uFF1A${Game.devTriggers}<br>
         \u4EA7\u54C1\u6539\u9700\u6C42\u6B21\u6570\uFF1A${Game.productTriggers}<br>
         \u8BC4\u4EF7\uFF1A${bugsKilled >= 10 ? '\u6D4B\u8BD5\u4E4B\u795E\uFF01\u5C31\u662F\u4F60\u4E86' : bugsKilled >= 5 ? '\u5408\u683C\u7684\u6D4B\u8BD5\u5DE5\u7A0B\u5E08' : '\u52C9\u5F3A\u53D1\u5E03\uFF0C\u4E0B\u6B21\u52AA\u529B'}
@@ -800,7 +802,7 @@ function showEndScreen(won) {
       <div style="width:100%;margin-top:12px;padding:12px;background:#0f172a;border-radius:8px;font-size:13px;color:#94a3b8;line-height:1.8;text-align:left;">
         <div style="color:#f87171;font-weight:700;margin-bottom:6px;">\u{1F50D} \u590D\u76D8\u5206\u6790</div>
         \u6B7B\u56E0\uFF1A${deathAnalysis}<br>
-        \u4E16\u754C\uFF1A${worldName}<br>
+        \u4E16\u754C\uFF1A${safeWorldName}<br>
         \u4EA7\u54C1\u6539\u9700\u6C42\u6B21\u6570\uFF1A${Game.productTriggers}<br>
         \u7814\u53D1\u5199Bug\u6B21\u6570\uFF1A${Game.devTriggers}<br>
         \u6B8B\u4F59\u5C4E\u5C71\uFF1A${remainingShishan} \u5757
@@ -838,7 +840,6 @@ function restartGame() {
 
   // 5. 重置游戏状态
   Game.state = 'input';
-  Game.victory = false;
   Game.lastInput = '';
   Game.pendingRuleData = null;
 

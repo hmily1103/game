@@ -43,7 +43,7 @@ const RuleEngine = {
       shishanRespawn: 1,
       bugSpeed: 1.0,
       bombTimer: 2.0,
-      playerSpeed: 1.0,
+      playerSpeed: 1.2,         // 与对象字面量一致
       chainExplosion: false,
       shishanRegenInterval: 0,
       shishanRegenPercent: 0,
@@ -126,6 +126,7 @@ const RuleEngine = {
       // === 机制规则 ===
       case 'chain_explosion':
         this.config.chainExplosion = true;
+        this.config.chainExplosionBoost = true;  // 映射到实际生效的配置
         rule.parsedLabel = '连锁爆炸已启用';
         break;
       case 'shishan_regen':
@@ -151,6 +152,7 @@ const RuleEngine = {
         break;
       case 'friendly_fire':
         this.config.friendlyFire = true;
+        this.config.testIsolation = true;  // friendly_fire 映射到 testIsolation（实际生效的配置）
         rule.parsedLabel = '炸弹只清地形';
         break;
       case 'time_pressure':

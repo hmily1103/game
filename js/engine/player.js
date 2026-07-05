@@ -12,7 +12,7 @@ const Player = {
   baseSpeed: 4,        // 基础速度（提高移动速度）
   speedBoost: 0,       // 加速剩余帧
   lives: 3,
-  maxBombs: 2,  // 默认2个炸弹，原来1个
+  maxBombs: 1,   // 默认1个炸弹（doubleBomb规则可提升到2）
   activeBombs: 0,
   invincible: 0,       // 无敌帧计数
   dead: false,

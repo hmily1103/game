@@ -5,6 +5,11 @@ const Sound = {
   enabled: true,
 
   init() {
+    // 避免重复创建 AudioContext（浏览器有数量限制）
+    if (this.ctx) {
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+      return;
+    }
     try {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
     } catch (e) {

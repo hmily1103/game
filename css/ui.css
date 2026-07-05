@@ -110,6 +110,142 @@
   100% { filter: brightness(1); }
 }
 
+/* ========== 心跳警告/加速最后3秒闪烁 ========== */
+.heart-critical {
+  animation: heart-pulse 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes heart-pulse {
+  0% { transform: scale(1); filter: brightness(1); }
+  100% { transform: scale(1.15); filter: brightness(1.4) drop-shadow(0 0 6px #ef4444); }
+}
+
+/* ========== 最后一条命 — 全屏红灯警告 ========== */
+.danger-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, transparent 72%, rgba(239, 68, 68, 0.18) 100%);
+  transition: opacity 0.3s;
+}
+
+.canvas-container.danger {
+  border-color: #ef4444;
+  animation: danger-border-pulse 0.8s ease-in-out infinite alternate;
+}
+
+.canvas-container.danger .danger-vignette {
+  opacity: 1;
+  animation: danger-vignette-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes danger-border-pulse {
+  0% {
+    border-color: #ef4444;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 8px rgba(239, 68, 68, 0.3);
+  }
+  100% {
+    border-color: #fca5a5;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 20px rgba(239, 68, 68, 0.5);
+  }
+}
+
+@keyframes danger-vignette-pulse {
+  0% { opacity: 0.3; }
+  100% { opacity: 0.7; }
+}
+
+/* ========== 开局规则警告 ========== */
+.rule-warning-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,0.7) 30%, rgba(0,0,0,0.9) 100%);
+  animation: rw-fade-in 0.3s ease forwards;
+}
+
+.rule-warning-overlay.dismissing {
+  animation: rw-fade-out 0.4s ease forwards;
+}
+
+.rule-warning-box {
+  text-align: center;
+  padding: 24px 36px;
+  max-width: 90%;
+}
+
+.rule-warning-title {
+  font-size: 26px;
+  font-weight: 900;
+  color: #ef4444;
+  text-shadow: 0 0 15px rgba(239,68,68,0.8), 2px 2px 0 #7f1d1d;
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+  animation: rw-title-shake 0.5s ease-in-out infinite alternate;
+}
+
+.rule-warning-subtitle {
+  font-size: 14px;
+  color: #fca5a5;
+  font-family: 'Courier New', monospace;
+  margin-bottom: 18px;
+  letter-spacing: 1px;
+}
+
+.rule-warning-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.rule-warning-item {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fbbf24;
+  text-shadow: 0 0 8px rgba(251,191,36,0.4), 1px 1px 0 #78350f;
+  padding: 8px 20px;
+  border: 1px solid rgba(251,191,36,0.3);
+  border-radius: 8px;
+  background: rgba(120,53,15,0.3);
+  white-space: nowrap;
+}
+
+.rule-warning-item.danger {
+  color: #f87171;
+  text-shadow: 0 0 8px rgba(248,113,113,0.5), 1px 1px 0 #7f1d1d;
+  border-color: rgba(248,113,113,0.4);
+  background: rgba(127,29,29,0.3);
+}
+
+.rule-warning-hint {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 16px;
+  font-family: 'Courier New', monospace;
+}
+
+@keyframes rw-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes rw-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes rw-title-shake {
+  0% { transform: translateX(-2px); }
+  100% { transform: translateX(2px); }
+}
+
 /* ========== Boss Bug 出场动画 ========== */
 @keyframes boss-flash {
   0% { opacity: 0; }

@@ -17,6 +17,7 @@ const Pickup = {
   init() {
     this.list = [];
     this.nextId = 0;
+    this.dropChance = 0.18;  // 重置掉落率（评委模式可能改过）
   },
 
   // 尝试从屎山掉落
