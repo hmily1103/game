@@ -77,7 +77,29 @@
   90% { transform: translate(-1px, 1px); }
 }
 
-/* 边框闪烁 — 产品捣乱 */
+/* 边框闪烁 — 产品捣乱（橙色） */
+.flash-border-product {
+  animation: flash-border-product 1s ease;
+}
+
+@keyframes flash-border-product {
+  0%, 100% { border-color: #475569; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5); }
+  25%, 75% { border-color: #f97316; box-shadow: 0 0 30px rgba(249, 115, 22, 0.6), 0 8px 32px rgba(0, 0, 0, 0.5); }
+  50% { border-color: #fb923c; box-shadow: 0 0 40px rgba(251, 146, 60, 0.7), 0 8px 32px rgba(0, 0, 0, 0.5); }
+}
+
+/* 边框闪烁 — 研发刷Bug（绿色） */
+.flash-border-dev {
+  animation: flash-border-dev 1s ease;
+}
+
+@keyframes flash-border-dev {
+  0%, 100% { border-color: #475569; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5); }
+  25%, 75% { border-color: #22c55e; box-shadow: 0 0 30px rgba(34, 197, 94, 0.5), 0 8px 32px rgba(0, 0, 0, 0.5); }
+  50% { border-color: #4ade80; box-shadow: 0 0 40px rgba(74, 222, 128, 0.6), 0 8px 32px rgba(0, 0, 0, 0.5); }
+}
+
+/* 旧版通用闪烁 — 保留兼容 */
 .flash-border {
   animation: flash-border 1s ease;
 }
@@ -95,7 +117,7 @@
 
 @keyframes count-pop {
   0% { transform: scale(1); color: #e2e8f0; }
-  50% { transform: scale(1.5); color: #4ade80; text-shadow: 0 0 12px rgba(74, 222, 128, 0.6); }
+  50% { transform: scale(1.5); color: #10B981; text-shadow: 0 0 12px rgba(16, 185, 129, 0.6); }
   100% { transform: scale(1); color: #e2e8f0; }
 }
 
@@ -125,36 +147,37 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 5;
+  z-index: 10;
   opacity: 0;
-  background: radial-gradient(ellipse at center, transparent 72%, rgba(239, 68, 68, 0.18) 100%);
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(220, 38, 38, 0.5) 100%);
   transition: opacity 0.3s;
 }
 
 .canvas-container.danger {
-  border-color: #ef4444;
-  animation: danger-border-pulse 0.8s ease-in-out infinite alternate;
+  border-color: #dc2626;
+  border-width: 2px;
+  animation: danger-border-pulse 0.6s ease-in-out infinite alternate;
 }
 
 .canvas-container.danger .danger-vignette {
   opacity: 1;
-  animation: danger-vignette-pulse 0.8s ease-in-out infinite alternate;
+  animation: danger-vignette-pulse 0.6s ease-in-out infinite alternate;
 }
 
 @keyframes danger-border-pulse {
   0% {
-    border-color: #ef4444;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 8px rgba(239, 68, 68, 0.3);
+    border-color: #dc2626;
+    box-shadow: 0 0 12px rgba(220, 38, 38, 0.5), 0 0 30px rgba(220, 38, 38, 0.2);
   }
   100% {
-    border-color: #fca5a5;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 20px rgba(239, 68, 68, 0.5);
+    border-color: #f87171;
+    box-shadow: 0 0 24px rgba(239, 68, 68, 0.7), 0 0 50px rgba(239, 68, 68, 0.35);
   }
 }
 
 @keyframes danger-vignette-pulse {
-  0% { opacity: 0.3; }
-  100% { opacity: 0.7; }
+  0% { opacity: 0.45; }
+  100% { opacity: 0.85; }
 }
 
 /* ========== 开局规则警告 ========== */
@@ -353,8 +376,8 @@
   left: 50%;
   transform: translate(-50%, -50%);
   background: rgba(15, 23, 42, 0.9);
-  border: 1px solid #4ade80;
-  color: #4ade80;
+  border: 1px solid #10B981;
+  color: #10B981;
   padding: 10px 20px;
   border-radius: 8px;
   font-size: 14px;
@@ -364,7 +387,7 @@
   opacity: 0;
   transition: opacity 0.4s;
   white-space: nowrap;
-  box-shadow: 0 4px 16px rgba(74, 222, 128, 0.2);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2);
 }
 
 .battle-hint.show {

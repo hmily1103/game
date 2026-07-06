@@ -9,7 +9,9 @@ const Player = {
   targetY: 0,
   moving: false,
   speed: 4,            // 像素/帧
-  baseSpeed: 4,        // 基础速度（提高移动速度）
+  baseSpeed: 4,        // 基础速度（用于升级加成）
+  speedMultiplier: 1,  // 规则引擎速度倍数（乘算，不覆盖升级）
+  bombRange: 3,        // 炸弹爆炸范围（升级可增加）
   speedBoost: 0,       // 加速剩余帧
   lives: 3,
   maxBombs: 1,   // 默认1个炸弹（doubleBomb规则可提升到2）
@@ -31,12 +33,14 @@ const Player = {
     this.invincible = 0;
     this.dead = false;
     this.speedBoost = 0;
-    this.speed = this.baseSpeed;  // 确保重置后速度正确
+    this.speed = this.baseSpeed * this.speedMultiplier;
+    this.bombRange = 3;
+    this.speedMultiplier = 1;
   },
 
   setSpeed(multiplier) {
-    this.baseSpeed = 4 * multiplier;  // 基数从3提高到4
-    this.speed = this.baseSpeed;
+    this.speedMultiplier = multiplier;
+    this.speed = this.baseSpeed * multiplier;
   },
 
   tryMove(dx, dy) {
@@ -56,6 +60,7 @@ const Player = {
   },
 
   update() {
+    if (Game.state !== 'playing') return;
     if (this.dead) return;
 
     // 加速效果递减
@@ -118,11 +123,9 @@ const Player = {
 
     if (this.lives <= 0) {
       this.dead = true;
-      Game.state = 'lost';
       Effects.bigShake();
       Danmaku.showBatch('death', 3);
-      // 直接触发结算页，不依赖 checkWinCondition
-      showEndScreen(false);
+      // 不直接调用结算，由 checkWinCondition 统一处理
     } else {
       Effects.shake();
     }

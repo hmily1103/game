@@ -23,6 +23,7 @@ const Bomb = {
   },
 
   update() {
+    if (Game.state !== 'playing') return;
     for (const bomb of this.list) {
       if (bomb.exploded) continue;
       bomb.timer--;
@@ -49,8 +50,8 @@ const Bomb = {
     Effects.explosion(bomb.gridX, bomb.gridY);
     Effects.floatText('\u{1F4A5}', bomb.gridX * CELL_SIZE + CELL_SIZE / 2, bomb.gridY * CELL_SIZE, '#F59E0B');
 
-    // 炸弹范围 — 默认3格（比原来2格大），技术债爆炸时+1
-    const range = RuleEngine.config.chainExplosionBoost ? 4 : 3;
+    // 炸弹范围 — 基于玩家 bombRange，技术债爆炸时+1
+    const range = (Player.bombRange || 3) + (RuleEngine.config.chainExplosionBoost ? 1 : 0);
     const fireDuration = 30;
 
     // 测试环境隔离 — 炸弹只炸屎山不炸Bug
@@ -66,24 +67,36 @@ const Bomb = {
         const tile = GameMap.get(fx, fy);
 
         if (tile === TILE.WALL) break;
-        if (tile === TILE.SHISHAN) {
-          GameMap.destroyShishan(fx, fy);
-          this.addFire(fx, fy, fireDuration);
-          // 加速状态下炸屎山 → 屎山飞出屏幕特效
-          if (Player.speedBoost > 0) {
-            Effects.shishanLaunch(fx, fy);
-            Effects.bigShake();
-            Effects.floatText('\u{1F4A9}\u26A1 \u5C4E\u5C71\u98DE\u51FA\u53BB\u4E86\uFF01', fx * CELL_SIZE + CELL_SIZE / 2, fy * CELL_SIZE, '#22d3ee');
-            Sound.play('speed');
+        // 屎山分层 — 普通1血/硬2血/祖传3血
+        if (tile === TILE.SHISHAN || tile === TILE.SHISHAN_HARD || tile === TILE.SHISHAN_LEGACY) {
+          const key = fx + ',' + fy;
+          const maxHp = tile === TILE.SHISHAN_LEGACY ? 3 : tile === TILE.SHISHAN_HARD ? 2 : 1;
+          const currentHp = (GameMap.shishanHealth[key] !== undefined) ? GameMap.shishanHealth[key] : maxHp;
+          const newHp = currentHp - 1;
+
+          if (newHp <= 0) {
+            // 彻底炸掉
+            GameMap.destroyShishan(fx, fy);
+            this.addFire(fx, fy, fireDuration);
+            Effects.floatText(
+              tile === TILE.SHISHAN_LEGACY ? '\u{1F4A3} \u7956\u4F20\u4EE3\u7801\u5D29\u6E83\uFF01' : '\u{1F4A9} \u6280\u672F\u503A\u6E05\u9664\uFF01',
+              fx * CELL_SIZE + CELL_SIZE / 2, fy * CELL_SIZE, tile === TILE.SHISHAN_LEGACY ? '#f59e0b' : '#84cc16');
+            if (tile === TILE.SHISHAN_LEGACY) {
+              Pickup.tryDrop(fx, fy);
+              Pickup.tryDrop(fx, fy);
+              Effects.bigShake();
+            }
+            if (tile !== TILE.SHISHAN_LEGACY) Pickup.tryDrop(fx, fy);
           } else {
-            Effects.shishanDestroy(fx, fy);
-            Effects.floatText('\u{1F4A9} \u5C4E\u5C71\u6E05\u7406\uFF01', fx * CELL_SIZE + CELL_SIZE / 2, fy * CELL_SIZE, '#84cc16');
+            // 还没炸掉 — 扣血警告
+            GameMap.shishanHealth[key] = newHp;
+            this.addFire(fx, fy, fireDuration);
+            Effects.floatText('\u{1F4A9} \u8FD8\u5DEE ' + newHp + ' \u6B21\uFF01',
+              fx * CELL_SIZE + CELL_SIZE / 2, fy * CELL_SIZE, '#fbbf24');
+            Effects.shake();
           }
-          Danmaku.show('kill');
           Sound.play('kill');
           Roast.trigger('destroyShishan');
-          // 尝试掉落道具
-          Pickup.tryDrop(fx, fy);
           break;
         }
 

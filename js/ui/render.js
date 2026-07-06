@@ -8,13 +8,13 @@ const Renderer = {
   // 世界氛围主题 — 根据当前规则动态切换色调
   worldTheme: {
     name: 'default',
-    floor1: '#1c1c3a',
-    floor2: '#222248',
-    floorGrid: 'rgba(80, 80, 130, 0.15)',
-    floorAccent: 'rgba(60, 60, 100, 0.2)',
-    wallBase: '#52528a',
-    wallTop: '#6a6aa0',
-    wallShadow: '#2a2a50',
+    floor1: '#1a2233',
+    floor2: '#222d3d',
+    floorGrid: 'rgba(80, 90, 120, 0.25)',
+    floorAccent: 'rgba(60, 70, 100, 0.2)',
+    wallBase: '#3a3d5c',
+    wallTop: '#4a4d6c',
+    wallShadow: '#222540',
     vignette: null,         // null = 无暗角, 颜色字符串 = 有暗角
   },
 
@@ -40,7 +40,7 @@ const Renderer = {
         floor1: '#2a1a1a', floor2: '#3a2222',
         floorGrid: 'rgba(120, 40, 40, 0.15)',
         floorAccent: 'rgba(100, 30, 30, 0.2)',
-        wallBase: '#5a3a3a', wallTop: '#7a4a4a', wallShadow: '#3a1a1a',
+        wallBase: '#4a3535', wallTop: '#5a4545', wallShadow: '#2a2020',
         vignette: 'rgba(80, 0, 0, 0.3)',
       };
     } else if (cfg.chainExplosionBoost) {
@@ -167,7 +167,7 @@ const Renderer = {
     for (let y = 0; y < GRID_SIZE; y++) {
       for (let x = 0; x < GRID_SIZE; x++) {
         const tile = GameMap.get(x, y);
-        if (tile === TILE.EMPTY || tile === TILE.SHISHAN) {
+        if (tile === TILE.EMPTY || tile === TILE.SHISHAN || tile === TILE.SHISHAN_HARD || tile === TILE.SHISHAN_LEGACY) {
           const px = x * CELL_SIZE * S;
           const py = y * CELL_SIZE * S;
           const cs = CELL_SIZE * S;
@@ -211,14 +211,17 @@ const Renderer = {
 
         if (tile === TILE.WALL) {
           this.drawWall(px, py, x, y);
-        } else if (tile === TILE.SHISHAN) {
-          this.drawShishan(px, py, x, y);
+        } else if (tile === TILE.SHISHAN || tile === TILE.SHISHAN_HARD || tile === TILE.SHISHAN_LEGACY) {
+          const key = x + ',' + y;
+          const hp = (GameMap.shishanHealth[key] !== undefined) ? GameMap.shishanHealth[key]
+            : (tile === TILE.SHISHAN_LEGACY ? 3 : tile === TILE.SHISHAN_HARD ? 2 : 1);
+          this.drawShishan(px, py, x, y, tile, hp);
         }
       }
     }
   },
 
-  // 硬墙 — 精致3D金属/砖石效果（世界主题色）
+  // 硬墙 — 简洁3D方块（无砖缝纹理，避免像代码/红砖墙）
   drawWall(px, py, gx, gy) {
     const ctx = this.ctx;
     const S = this.SCALE;
@@ -226,81 +229,43 @@ const Renderer = {
     const seed = (gx * 37 + gy * 73) % 100;
     const theme = this.worldTheme;
 
-    // 主体渐变 — 使用世界主题色
+    // 主体渐变
     const grad = ctx.createLinearGradient(px, py, px, py + cs);
     grad.addColorStop(0, theme.wallTop);
     grad.addColorStop(0.3, theme.wallBase);
-    grad.addColorStop(0.7, theme.wallShadow);
     grad.addColorStop(1, theme.wallShadow);
     ctx.fillStyle = grad;
     ctx.fillRect(px, py, cs, cs);
 
     // 顶面高光 — 亮色斜面
     const topGrad = ctx.createLinearGradient(px, py, px, py + cs * 0.15);
-    topGrad.addColorStop(0, 'rgba(160, 160, 210, 0.6)');
-    topGrad.addColorStop(1, 'rgba(120, 120, 180, 0)');
+    topGrad.addColorStop(0, 'rgba(180, 180, 220, 0.4)');
+    topGrad.addColorStop(1, 'rgba(100, 100, 160, 0)');
     ctx.fillStyle = topGrad;
     ctx.fillRect(px, py, cs, cs * 0.15);
 
     // 左侧高光
     const leftGrad = ctx.createLinearGradient(px, py, px + cs * 0.1, py);
-    leftGrad.addColorStop(0, 'rgba(140, 140, 190, 0.4)');
-    leftGrad.addColorStop(1, 'rgba(120, 120, 180, 0)');
+    leftGrad.addColorStop(0, 'rgba(150, 150, 200, 0.3)');
+    leftGrad.addColorStop(1, 'rgba(100, 100, 160, 0)');
     ctx.fillStyle = leftGrad;
     ctx.fillRect(px, py, cs * 0.1, cs);
 
     // 底面阴影
     const botGrad = ctx.createLinearGradient(px, py + cs * 0.85, px, py + cs);
-    botGrad.addColorStop(0, 'rgba(20, 20, 40, 0)');
-    botGrad.addColorStop(1, 'rgba(15, 15, 30, 0.7)');
+    botGrad.addColorStop(0, 'rgba(15, 15, 30, 0)');
+    botGrad.addColorStop(1, 'rgba(10, 10, 25, 0.5)');
     ctx.fillStyle = botGrad;
     ctx.fillRect(px, py + cs * 0.85, cs, cs * 0.15);
 
-    // 右侧阴影
-    const rightGrad = ctx.createLinearGradient(px + cs * 0.9, py, px + cs, py);
-    rightGrad.addColorStop(0, 'rgba(20, 20, 40, 0)');
-    rightGrad.addColorStop(1, 'rgba(15, 15, 30, 0.5)');
-    ctx.fillStyle = rightGrad;
-    ctx.fillRect(px + cs * 0.9, py, cs * 0.1, cs);
-
-    // 砖块纹理 — 不规则砖缝（根据 seed 变化）
-    ctx.strokeStyle = 'rgba(20, 20, 45, 0.6)';
-    ctx.lineWidth = S;
-    // 水平砖缝
-    ctx.beginPath();
-    ctx.moveTo(px + S * 2, py + cs * 0.5);
-    ctx.lineTo(px + cs - S * 2, py + cs * 0.5);
-    ctx.stroke();
-    // 竖直砖缝 — 位置根据 seed 错开
-    const splitX = seed < 50 ? cs * 0.35 : cs * 0.6;
-    ctx.beginPath();
-    ctx.moveTo(px + splitX, py + S * 2);
-    ctx.lineTo(px + splitX, py + cs * 0.5 - S);
-    ctx.stroke();
-    const splitX2 = seed < 50 ? cs * 0.65 : cs * 0.4;
-    ctx.beginPath();
-    ctx.moveTo(px + splitX2, py + cs * 0.5 + S);
-    ctx.lineTo(px + splitX2, py + cs - S * 2);
-    ctx.stroke();
-
-    // 随机砖块高光点
-    ctx.fillStyle = 'rgba(180, 180, 230, 0.25)';
-    if (seed < 30) {
-      ctx.fillRect(px + S * 4, py + S * 4, S * 3, S);
-    } else if (seed < 60) {
-      ctx.fillRect(px + cs - S * 8, py + cs * 0.5 + S * 3, S * 3, S);
-    } else {
-      ctx.fillRect(px + S * 5, py + cs * 0.5 - S * 3, S * 2, S);
-    }
-
-    // 外边框 — 深色描边
-    ctx.strokeStyle = 'rgba(10, 10, 25, 0.8)';
+    // 外边框
+    ctx.strokeStyle = 'rgba(10, 10, 25, 0.6)';
     ctx.lineWidth = S;
     ctx.strokeRect(px + S * 0.5, py + S * 0.5, cs - S, cs - S);
   },
 
   // 屎山 — 便便堆造型，绿色恶臭气波 + 大号 emoji（高分辨率版）
-  drawShishan(px, py, gx, gy) {
+  drawShishan(px, py, gx, gy, tileType, hp) {
     const ctx = this.ctx;
     const S = this.SCALE;
     const cs = CELL_SIZE * S;
@@ -337,24 +302,40 @@ const Renderer = {
       }
     }
 
-    // 便便底部圆盘 — 深棕色渐变
+    // 便便底部圆盘 — 根据类型不同颜色
     const baseGrad = ctx.createRadialGradient(
       cx, cy, 2 * S,
       cx, cy, cs / 2 - 2 * S
     );
-    baseGrad.addColorStop(0, '#6B4423');
-    baseGrad.addColorStop(1, '#4A2C0F');
+    if (tileType === TILE.SHISHAN_LEGACY) {
+      baseGrad.addColorStop(0, '#1a1a2e');
+      baseGrad.addColorStop(1, '#0a0a1a');
+    } else if (tileType === TILE.SHISHAN_HARD) {
+      baseGrad.addColorStop(0, '#5C3A1E');
+      baseGrad.addColorStop(1, '#3D2010');
+    } else {
+      baseGrad.addColorStop(0, '#6B4423');
+      baseGrad.addColorStop(1, '#4A2C0F');
+    }
     ctx.fillStyle = baseGrad;
     ctx.beginPath();
     ctx.ellipse(cx, cy + 4 * S, cs / 2 - 4 * S, cs / 2 - 6 * S, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // 便便螺旋纹理 — 三层从大到小堆叠
+    // 便便螺旋纹理 — layer colors based on type
     for (let layer = 0; layer < 3; layer++) {
       const ly = cy + 6 * S - layer * 7 * S;
       const lr = (cs / 2 - 6 * S) - layer * 4 * S;
       const lh = (5 - layer) * S;
-      ctx.fillStyle = layer === 0 ? '#5A3818' : layer === 1 ? '#6B4423' : '#7B5530';
+      let colorL;
+      if (tileType === TILE.SHISHAN_LEGACY) {
+        colorL = layer === 0 ? '#1E1E3E' : layer === 1 ? '#28285A' : '#323278';
+      } else if (tileType === TILE.SHISHAN_HARD) {
+        colorL = layer === 0 ? '#4A3018' : layer === 1 ? '#5C3D20' : '#6E4A28';
+      } else {
+        colorL = layer === 0 ? '#5A3818' : layer === 1 ? '#6B4423' : '#7B5530';
+      }
+      ctx.fillStyle = colorL;
       ctx.beginPath();
       ctx.ellipse(cx, ly, lr, lh, 0, 0, Math.PI * 2);
       ctx.fill();
@@ -374,13 +355,23 @@ const Renderer = {
     ctx.closePath();
     ctx.fill();
 
-    // 中心大号 💩 emoji — 带浮动+抖动
+    // 根据类型显示不同 emoji
     const wobble = Math.sin(t * 0.08) * 1.5 * S;
     const float = Math.sin(t * 0.05) * S;
     ctx.font = `${20 * S}px serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('\u{1F4A9}', cx + wobble, cy - 4 * S + float);
+    const emoji = tileType === TILE.SHISHAN_LEGACY ? '\u{1F480}' :  // 骷髅
+                  tileType === TILE.SHISHAN_HARD ? '\u{1F9F1}' :    // 砖块
+                  '\u{1F4A9}';                                        // 便便
+    ctx.fillText(emoji, cx + wobble, cy - 4 * S + float);
+
+    // HP 指示 — 硬屎山和祖传代码显示剩余血量
+    if (hp > 1) {
+      ctx.font = `${(8 * S)}px "Courier New",monospace`;
+      ctx.fillStyle = hp >= 3 ? '#ef4444' : '#fbbf24';
+      ctx.fillText('💥'.repeat(hp), cx, cy + 12 * S);
+    }
 
     // 偶尔的绿头苍蝇 — 绕着便便飞
     const flyPhase = (t * 0.03) % (Math.PI * 2);
@@ -524,11 +515,33 @@ const Renderer = {
 
   drawEnemies() {
     const ctx = this.ctx;
+    const isLastBug = Enemy.count() === 1 && Enemy.list.filter(e => e.alive).length === 1;
+
     for (const e of Enemy.list) {
       if (!e.alive) continue;
 
       // 幽灵虫 — 不可见时跳过
       if (e.type === 'ghost' && !e.visible) continue;
+
+      // 最后一只Bug — 红色脉冲光环
+      if (isLastBug && e.type !== 'boss') {
+        const S = this.SCALE;
+        const cs = CELL_SIZE * S;
+        const cx = e.pixelX * S + cs / 2;
+        const cy = e.pixelY * S + cs / 2;
+        const pulse = 0.5 + 0.5 * Math.sin(this.animFrame * 0.2);
+        ctx.save();
+        ctx.globalAlpha = 0.3 + pulse * 0.4;
+        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cs * 1.2);
+        grad.addColorStop(0, 'rgba(239, 68, 68, 0.6)');
+        grad.addColorStop(0.5, 'rgba(239, 68, 68, 0.3)');
+        grad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, cs * 1.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
 
       // 按类型渲染
       switch (e.type) {
@@ -574,13 +587,13 @@ const Renderer = {
     ctx.fill();
 
     // Bug 身体底光
-    ctx.fillStyle = 'rgba(74, 222, 128, 0.12)';
+    ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
     ctx.beginPath();
     ctx.arc(cx, cy, 18 * S, 0, Math.PI * 2);
     ctx.fill();
 
     // 6 条腿
-    ctx.strokeStyle = '#166534';
+    ctx.strokeStyle = '#991b1b';
     ctx.lineWidth = 1.5 * S;
     ctx.lineCap = 'round';
     const legSwing = Math.sin(this.animFrame * 0.5 + e.id) * 3 * S;
@@ -601,22 +614,22 @@ const Renderer = {
       ctx.stroke();
     }
 
-    // 身体 — 绿色渐变
+    // 身体 — 红色渐变
     const grad = ctx.createRadialGradient(
       cx - 3 * S, cy - 4 * S, 2 * S,
       cx, cy, 14 * S
     );
-    grad.addColorStop(0, '#86efac');
-    grad.addColorStop(0.4, '#4ade80');
-    grad.addColorStop(0.8, '#16a34a');
-    grad.addColorStop(1, '#14532d');
+    grad.addColorStop(0, '#fca5a5');
+    grad.addColorStop(0.4, '#ef4444');
+    grad.addColorStop(0.8, '#dc2626');
+    grad.addColorStop(1, '#7f1d1d');
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.ellipse(cx, cy + S, 12 * S, 10 * S, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // 背纹
-    ctx.strokeStyle = '#14532d';
+    ctx.strokeStyle = '#7f1d1d';
     ctx.lineWidth = S;
     ctx.beginPath();
     ctx.moveTo(cx, cy - 8 * S);
@@ -624,7 +637,7 @@ const Renderer = {
     ctx.stroke();
 
     // 触角
-    ctx.strokeStyle = '#166534';
+    ctx.strokeStyle = '#991b1b';
     ctx.lineWidth = 1.5 * S;
     ctx.beginPath();
     ctx.moveTo(px + 14 * S, py + 8 * S);
@@ -634,7 +647,7 @@ const Renderer = {
     ctx.moveTo(px + cs - 14 * S, py + 8 * S);
     ctx.quadraticCurveTo(px + cs - 12 * S - wobble, py + S, px + cs - 9 * S, py - 3 * S - wobble);
     ctx.stroke();
-    ctx.fillStyle = '#4ade80';
+    ctx.fillStyle = '#ef4444';
     ctx.beginPath();
     ctx.arc(px + 9 * S, py - 3 * S + wobble, 2 * S, 0, Math.PI * 2);
     ctx.fill();
@@ -1184,12 +1197,12 @@ const Renderer = {
         ctx.globalAlpha = 0.12 * (4 - i) / 3;
         const dx = Math.sign(Player.targetX - Player.pixelX) * i * 6 * S;
         const dy = Math.sign(Player.targetY - Player.pixelY) * i * 6 * S;
-        ctx.fillStyle = '#4ade80';
+        ctx.fillStyle = '#60a5fa';
         this.roundRect(ctx, px + 10 * S - dx, py + 15 * S + wobble - dy, cs - 20 * S, cs - 21 * S, 4 * S);
         ctx.fill();
       }
       ctx.globalAlpha = 1;
-      ctx.strokeStyle = `rgba(74,222,128,${0.3 + Math.sin(t * 0.3) * 0.2})`;
+      ctx.strokeStyle = `rgba(96,165,250,${0.3 + Math.sin(t * 0.3) * 0.2})`;
       ctx.lineWidth = 1.5 * S;
       ctx.beginPath();
       ctx.arc(cx, cy, 17 * S + Math.sin(t * 0.2) * 2 * S, 0, Math.PI * 2);
@@ -1202,11 +1215,11 @@ const Renderer = {
     ctx.ellipse(cx, py + cs - 2 * S, 11 * S, 3 * S, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // ════════ 身体 — 绿色测试服 ════════
+    // ════════ 身体 — 蓝色测试服 ════════
     const bodyGrad = ctx.createLinearGradient(px, py + 18 * S, px, py + cs);
-    bodyGrad.addColorStop(0, '#22c55e');
-    bodyGrad.addColorStop(0.7, '#16a34a');
-    bodyGrad.addColorStop(1, '#15803d');
+    bodyGrad.addColorStop(0, '#3B82F6');
+    bodyGrad.addColorStop(0.7, '#2563EB');
+    bodyGrad.addColorStop(1, '#1D4ED8');
     ctx.fillStyle = bodyGrad;
     this.roundRect(ctx, px + 9 * S, py + 18 * S + wobble, cs - 18 * S, cs - 24 * S, 5 * S);
     ctx.fill();
@@ -1215,13 +1228,13 @@ const Renderer = {
     this.roundRect(ctx, px + 10 * S, py + 19 * S + wobble, 3 * S, cs - 26 * S, 2 * S);
     ctx.fill();
 
-    // ════════ 胸口 — 白色 + 绿勾 ════════
+    // ════════ 胸口 — 白色 + 蓝勾 ════════
     const chestY = py + 22 * S + wobble;
     ctx.fillStyle = '#f0fdf4';
     this.roundRect(ctx, cx - 7 * S, chestY, 14 * S, 10 * S, 3 * S);
     ctx.fill();
-    // 绿勾 — 验证概念
-    ctx.strokeStyle = '#16a34a';
+    // 蓝勾 — 验证通过
+    ctx.strokeStyle = '#2563EB';
     ctx.lineWidth = 2 * S;
     ctx.lineCap = 'round';
     ctx.beginPath();
@@ -1238,10 +1251,10 @@ const Renderer = {
     // ════════ 头部 ════════
     const headY = py + 4 * S + wobble;
 
-    // 头发 — 深绿
+    // 头发 — 深蓝
     const hairGrad = ctx.createLinearGradient(px, headY, px, headY + 8 * S);
-    hairGrad.addColorStop(0, '#166534');
-    hairGrad.addColorStop(1, '#14532d');
+    hairGrad.addColorStop(0, '#1E3A5F');
+    hairGrad.addColorStop(1, '#172554');
     ctx.fillStyle = hairGrad;
     this.roundRect(ctx, px + 12 * S, headY, cs - 24 * S, 8 * S, 4 * S);
     ctx.fill();
@@ -1260,12 +1273,12 @@ const Renderer = {
     const gRX = cx + 5 * S;      // 右镜片中心X
     const gR = 5.5 * S;          // 镜片半径
 
-    // 镜片 — 淡绿AR镀膜效果
+    // 镜片 — 淡蓝AR镀膜效果
     const mkLens = (x, y) => {
       const g2 = ctx.createRadialGradient(x - S, y - S, 0, x, y, gR);
-      g2.addColorStop(0, 'rgba(134,239,172,0.35)');
-      g2.addColorStop(0.6, 'rgba(34,197,94,0.12)');
-      g2.addColorStop(1, 'rgba(34,197,94,0.03)');
+      g2.addColorStop(0, 'rgba(147,197,253,0.35)');
+      g2.addColorStop(0.6, 'rgba(59,130,246,0.12)');
+      g2.addColorStop(1, 'rgba(59,130,246,0.03)');
       ctx.fillStyle = g2;
       ctx.beginPath();
       ctx.arc(x, y, gR, 0, Math.PI * 2);
@@ -1274,8 +1287,8 @@ const Renderer = {
     mkLens(gLX, gY);
     mkLens(gRX, gY);
 
-    // 镜框 — 深绿
-    ctx.strokeStyle = '#14532d';
+    // 镜框 — 深灰
+    ctx.strokeStyle = '#1E293B';
     ctx.lineWidth = 1.2 * S;
     ctx.beginPath(); ctx.arc(gLX, gY, gR, 0, Math.PI * 2); ctx.stroke();
     ctx.beginPath(); ctx.arc(gRX, gY, gR, 0, Math.PI * 2); ctx.stroke();
@@ -1379,7 +1392,6 @@ const Renderer = {
 
   // 圆角矩形辅助
   roundRect(ctx, x, y, w, h, r) {
-    ctx.beginPath();
     ctx.moveTo(x + r, y);
     ctx.arcTo(x + w, y, x + w, y + h, r);
     ctx.arcTo(x + w, y + h, x, y + h, r);

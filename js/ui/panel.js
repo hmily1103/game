@@ -20,12 +20,12 @@ const Panel = {
 
     if (ruleData.rules && ruleData.rules.length > 0) {
       for (const rule of ruleData.rules) {
+        const label = rule.parsedLabel || escapeHtml(rule.name || '未知规则');
         html += `
           <div class="rule-item">
             <div class="rule-item-name">${escapeHtml(rule.name || '未知规则')}</div>
-            <div class="rule-item-effect">${escapeHtml(rule.effect || '')}</div>
-            <div class="rule-item-parsed">→ 解析为：${escapeHtml(rule.parsedLabel || '机制规则已启用')}</div>
-            <div class="rule-item-effect" style="color: #64748b; margin-top: 4px;">${escapeHtml(rule.impact || '')}</div>
+            <div class="rule-item-parsed">${label}</div>
+            ${rule.impact ? `<div class="rule-item-impact">${escapeHtml(rule.impact)}</div>` : ''}
           </div>
         `;
       }
@@ -34,7 +34,7 @@ const Panel = {
     const source = ruleData.source || '未知';
     const isAI = source.includes('AI');
     const sourceIcon = isAI ? '✅' : '📦';
-    const sourceColor = isAI ? '#4ade80' : '#fbbf24';
+    const sourceColor = isAI ? '#10B981' : '#fbbf24';
     html += `<div class="rule-source" style="color:${sourceColor}">${escapeHtml(source)} ${sourceIcon}</div>`;
 
     if (ruleData.worldVibe) {
@@ -57,7 +57,7 @@ const Panel = {
   flashRole(role) {
     const panel = document.getElementById('rule-panel');
     if (!panel) return;
-    const color = role === 'product' ? '#fbbf24' : '#4ade80';
+    const color = role === 'product' ? '#fbbf24' : '#10B981';
     panel.style.borderColor = color;
     panel.style.boxShadow = `0 0 16px ${color}66`;
     setTimeout(() => {

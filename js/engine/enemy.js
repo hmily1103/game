@@ -5,6 +5,7 @@ const Enemy = {
   list: [],
   nextId: 0,
   spawnCount: 0,
+  maxAlive: 12, // 最大同时存活的 Bug 数量，防止卡顿
   // 各类型击杀统计
   killStats: { normal: 0, ghost: 0, crash: 0, p0: 0, boss: 0 },
 
@@ -14,7 +15,7 @@ const Enemy = {
       speed: 1.0,
       health: 1,
       scoreLabel: 'Bug',
-      color: '#4ade80',
+      color: '#ef4444',
     },
     ghost: {
       speed: 1.4,
@@ -64,6 +65,11 @@ const Enemy = {
   spawn(type, x, y) {
     type = type || 'normal';
     const config = this.TYPE_CONFIG[type];
+    
+    // 检查是否超过上限
+    if (this.count() >= this.maxAlive) {
+      return;
+    }
 
     let pos;
     if (x !== undefined && y !== undefined) {
@@ -153,6 +159,31 @@ const Enemy = {
   onKill(e) {
     const isSpecial = e.type !== 'normal';
     const isBoss = e.type === 'boss';
+
+    // === 连击系统 ===
+    Game.combo++;
+    Game.comboTimer = Game.comboWindow; // 重置3秒窗口
+    if (Game.combo > Game.maxCombo) Game.maxCombo = Game.combo;
+
+    // 连击飘字
+    if (Game.combo >= 5) {
+      Effects.floatText('🔥 x' + Game.combo + ' 神级连击！', 
+        e.gridX * CELL_SIZE + CELL_SIZE/2, e.gridY * CELL_SIZE - 20, '#f59e0b');
+      Danmaku.showBatch('combo', 1);
+    } else if (Game.combo >= 3) {
+      Effects.floatText('⚡ x' + Game.combo + ' 连击！', 
+        e.gridX * CELL_SIZE + CELL_SIZE/2, e.gridY * CELL_SIZE - 15, '#22d3ee');
+    } else if (Game.combo >= 2) {
+      Effects.floatText('x' + Game.combo, 
+        e.gridX * CELL_SIZE + CELL_SIZE/2, e.gridY * CELL_SIZE - 10, '#a78bfa');
+    }
+
+    // === 局内成长系统 ===
+    Game.xp += (isBoss ? 3 : isSpecial ? 2 : 1);
+    if (Game.xp >= Game.level * Game.xpPerLevel && !Game.levelUpReady && Game.levelUpCooldown <= 0) {
+      Game.levelUpReady = true;
+      showLevelUpUI();
+    }
 
     // 基础爆炸
     Effects.explosion(e.gridX, e.gridY);
@@ -246,8 +277,13 @@ const Enemy = {
     if (e.splitOnDeath) {
       const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
       let split = 0;
+      // 分裂前检查是否快到上限，防止爆炸式增长
+      const remainingSlots = this.maxAlive - this.count();
+      const maxSplit = Math.min(2, remainingSlots);
+      if (maxSplit <= 0) return;
+      
       for (const [dx, dy] of dirs) {
-        if (split >= 2) break;
+        if (split >= maxSplit) break;
         if (GameMap.isWalkable(e.gridX + dx, e.gridY + dy) && !Bomb.isAt(e.gridX + dx, e.gridY + dy)) {
           this.spawn('normal', e.gridX + dx, e.gridY + dy);
           split++;
@@ -257,6 +293,7 @@ const Enemy = {
   },
 
   update() {
+    if (Game.state !== 'playing') return;
     for (let i = this.list.length - 1; i >= 0; i--) {
       const e = this.list[i];
       if (!e.alive) {
@@ -309,11 +346,15 @@ const Enemy = {
           }
 
           Effects.floatText('\u{1F4A5} \u7EBF\u4E0A\u6B7B\u673A\uFF01\u6D4B\u8BD5\u88AB\u70B9\u71C3\u4E86\uFF01',
-            e.gridX * CELL_SIZE + CELL_SIZE/2, e.gridY * CELL_SIZE, '#ef4444');
-          Effects.banner('\u{1F6A8} \u7EBF\u4E0A\u4E8B\u6545\uFF01\u6B7B\u673A Bug \u7206\u70B8\u4E86\uFF01');
-          Danmaku.show('crashExplode');
-          continue;
-        }
+        e.gridX * CELL_SIZE + CELL_SIZE/2, e.gridY * CELL_SIZE, '#ef4444');
+      Effects.banner('\u{1F6A8} \u7EBF\u4E0A\u4E8B\u6545\uFF01\u6B7B\u673A Bug \u7206\u70B8\u4E86\uFF01');
+      Danmaku.show('crashExplode');
+      // 检查是否满足胜利条件
+      if (typeof checkWinCondition === 'function') {
+        checkWinCondition();
+      }
+      continue;
+    }
         continue; // 死机虫不移动
       }
 
@@ -343,7 +384,18 @@ const Enemy = {
       // 随机游走
       if (!e.moving) {
         const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-        if (Math.random() < 0.3) {
+
+        // 检查相邻格是否有炸弹 — 有炸弹时降低随机换方向概率，更容易被堵住
+        let adjacentBomb = false;
+        for (const [ddx, ddy] of dirs) {
+          if (Bomb.isAt(e.gridX + ddx, e.gridY + ddy)) {
+            adjacentBomb = true;
+            break;
+          }
+        }
+        // 正常情况30%随机换方向；附近有炸弹时降到10%，更容易被玩家预判和堵住
+        const randomChance = adjacentBomb ? 0.1 : 0.3;
+        if (Math.random() < randomChance) {
           e.dir = Math.floor(Math.random() * 4);
         }
 

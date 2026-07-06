@@ -7,10 +7,13 @@ const TILE = {
   EMPTY: 0,
   WALL: 1,
   SHISHAN: 2,
+  SHISHAN_HARD: 3,     // 硬屎山 — 需2颗炸弹
+  SHISHAN_LEGACY: 4,   // 祖传代码 — 需3颗炸弹，炸掉必掉道具
 };
 
 const GameMap = {
   grid: [],
+  shishanHealth: {},   // "x,y" -> 剩余血量（仅对硬/祖传有效）
   initialShishanCount: 0,
   destroyedShishan: 0,
   totalShishanEver: 0,  // 所有曾出现的屎山（统计用）
@@ -19,6 +22,7 @@ const GameMap = {
 
   init() {
     this.grid = [];
+    this.shishanHealth = {};
     this.destroyedShishan = 0;
     this.initialShishanCount = 0;
     this.totalShishanEver = 0;
@@ -100,19 +104,30 @@ const GameMap = {
     for (let y = 1; y < GRID_SIZE - 1; y++) {
       for (let x = 1; x < GRID_SIZE - 1; x++) {
         if (this.grid[y][x] === TILE.EMPTY && Math.random() < 0.12) {
-          this.grid[y][x] = TILE.SHISHAN;
+          const roll = Math.random();
+          if (roll < 0.03) {
+            this.grid[y][x] = TILE.SHISHAN_LEGACY;
+            this.shishanHealth[x + ',' + y] = 3;
+          } else if (roll < 0.12) {
+            this.grid[y][x] = TILE.SHISHAN_HARD;
+            this.shishanHealth[x + ',' + y] = 2;
+          } else {
+            this.grid[y][x] = TILE.SHISHAN;
+          }
           this.initialShishanCount++;
         }
       }
     }
 
     // 确保玩家出生点和旁边安全区域没有屎山
+    const isShishan = (t) => t === TILE.SHISHAN || t === TILE.SHISHAN_HARD || t === TILE.SHISHAN_LEGACY;
     const safeZones = [
-      [1, 1], [2, 1], [1, 2],         // 左上（出生点）
-      [GRID_SIZE-2, GRID_SIZE-2], [GRID_SIZE-3, GRID_SIZE-2], [GRID_SIZE-2, GRID_SIZE-3], // 右下
+      [1, 1], [2, 1], [1, 2],
+      [GRID_SIZE-2, GRID_SIZE-2], [GRID_SIZE-3, GRID_SIZE-2], [GRID_SIZE-2, GRID_SIZE-3],
     ];
     for (const [x, y] of safeZones) {
-      if (this.grid[y][x] === TILE.SHISHAN) {
+      if (isShishan(this.grid[y][x])) {
+        delete this.shishanHealth[x + ',' + y];
         this.grid[y][x] = TILE.EMPTY;
         this.initialShishanCount--;
       }
@@ -226,8 +241,11 @@ const GameMap = {
   },
 
   destroyShishan(x, y) {
-    if (this.get(x, y) === TILE.SHISHAN) {
+    const tile = this.get(x, y);
+    const key = x + ',' + y;
+    if (tile === TILE.SHISHAN || tile === TILE.SHISHAN_HARD || tile === TILE.SHISHAN_LEGACY) {
       this.set(x, y, TILE.EMPTY);
+      delete this.shishanHealth[key];
       this.destroyedShishan++;
       return true;
     }
@@ -236,9 +254,15 @@ const GameMap = {
 
   respawnShishan(x, y) {
     if (this.get(x, y) === TILE.EMPTY && this.countShishan() < this.maxShishan) {
-      this.set(x, y, TILE.SHISHAN);
+      const roll = Math.random();
+      let tileType = TILE.SHISHAN;
+      if (roll < 0.08) tileType = TILE.SHISHAN_HARD;
+      this.set(x, y, tileType);
+      if (tileType === TILE.SHISHAN_HARD) {
+        this.shishanHealth[x + ',' + y] = 2;
+      }
       this.totalShishanEver++;
-      this.productRespawnCount++;  // 产品复活计入清除率分母
+      this.productRespawnCount++;
       return true;
     }
     return false;
@@ -248,15 +272,32 @@ const GameMap = {
   spawnShishanAt(x, y) {
     if (this.countShishan() >= this.maxShishan) return false;
 
+    // 随机决定类型：5% 祖传代码 / 20% 硬屎山 / 75% 普通
+    const roll = Math.random();
+    let tileType = TILE.SHISHAN;
+    if (roll < 0.05) tileType = TILE.SHISHAN_LEGACY;
+    else if (roll < 0.25) tileType = TILE.SHISHAN_HARD;
+
+    const placeShishan = (nx, ny) => {
+      this.set(nx, ny, tileType);
+      this.totalShishanEver++;
+      if (tileType !== TILE.SHISHAN) {
+        const key = nx + ',' + ny;
+        this.shishanHealth[key] = tileType === TILE.SHISHAN_LEGACY ? 3 : 2;
+      }
+      // 提示文字
+      const texts = tileType === TILE.SHISHAN_LEGACY
+        ? ['💀 祖传代码出现！前人留下的咒语', '⚔️ 这段代码没人敢动、、、、']
+        : tileType === TILE.SHISHAN_HARD
+        ? ['🧱 硬屎山！需要两颗测试用例', '🧱 这块屎山有点硬、、、、']
+        : ['💩 又一座屎山拔地而起！', '🎉 屎山生成成功！程序员落泪'];
+      Effects.banner(texts[0]);
+      Danmaku.showBatch('shishanSpawn', 1);
+    };
+
     // 尝试指定位置
     if (this.get(x, y) === TILE.EMPTY) {
-      this.set(x, y, TILE.SHISHAN);
-      this.totalShishanEver++;
-      // 弹幕：屎山生成时显示搞笑文字
-      const texts = ['😂 哈哈哈恭喜你发现了屎山代码！', '💩 又一座屎山拔地而起！', '🎉 屎山生成成功！程序员落泪', '⚠️ 警告：代码复杂度+10086'];
-      const pick = texts[Math.floor(Math.random() * texts.length)];
-      Effects.banner(pick);
-      Danmaku.showBatch('shishanSpawn', 2);
+      placeShishan(x, y);
       return true;
     }
 
@@ -265,12 +306,7 @@ const GameMap = {
     for (const [dx, dy] of dirs) {
       const nx = x + dx, ny = y + dy;
       if (this.get(nx, ny) === TILE.EMPTY) {
-        this.set(nx, ny, TILE.SHISHAN);
-        this.totalShishanEver++;
-        const texts = ['😂 哈哈哈恭喜你发现了屎山代码！', '💩 又一座屎山拔地而起！', '🎉 屎山生成成功！程序员落泪', '⚠️ 警告：代码复杂度+10086'];
-        const pick = texts[Math.floor(Math.random() * texts.length)];
-        Effects.banner(pick);
-        Danmaku.showBatch('shishanSpawn', 2);
+        placeShishan(nx, ny);
         return true;
       }
     }
@@ -282,7 +318,8 @@ const GameMap = {
     let count = 0;
     for (let y = 0; y < GRID_SIZE; y++) {
       for (let x = 0; x < GRID_SIZE; x++) {
-        if (this.grid[y][x] === TILE.SHISHAN) count++;
+        const t = this.grid[y][x];
+        if (t === TILE.SHISHAN || t === TILE.SHISHAN_HARD || t === TILE.SHISHAN_LEGACY) count++;
       }
     }
     return count;
@@ -319,7 +356,7 @@ const GameMap = {
           // 检查周围是否有屎山
           const neighbors = [[x-1,y],[x+1,y],[x,y-1],[x,y+1]];
           for (const [nx, ny] of neighbors) {
-            if (this.get(nx, ny) === TILE.SHISHAN) {
+            if (this.get(nx, ny) === TILE.SHISHAN || this.get(nx, ny) === TILE.SHISHAN_HARD || this.get(nx, ny) === TILE.SHISHAN_LEGACY) {
               candidates.push({ x, y });
               break;
             }

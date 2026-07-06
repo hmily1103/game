@@ -111,6 +111,7 @@ const Pickup = {
   },
 
   update() {
+    if (Game.state !== 'playing') return;
     for (let i = this.list.length - 1; i >= 0; i--) {
       const p = this.list[i];
       p.bobOffset = Math.sin((Game.frameCount + p.id * 10) * 0.1) * 3;

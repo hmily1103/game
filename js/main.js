@@ -26,56 +26,71 @@ const Game = {
   ghostInterval: 1800,  // 30秒
   crashInterval: 2400,  // 40秒
   p0Interval: 3600,     // 60秒
-  bossInterval: 5400,   // 90秒
+  bossInterval: 3600,   // 60秒
   // 发呆检测
   idleTimer: 0,
   idleThreshold: 360,   // 6秒不动触发吐槽
   // Bug 浪潮计时器
   bugWaveTimer: 0,
   bugWaveInterval: 2700, // 约45秒触发一次"一大波Bug"
-  bugWaveTriggered: false, // 是否已触发过
+  bugWaveTriggered: false,
+  lastBugTriggered: false, // 最后一只Bug横幅是否已触发
   // 战场引导提示
   hintQueue: [],
   hintTimer: 0,
+  // 连击系统
+  combo: 0,            // 当前连击数
+  comboTimer: 0,        // 连击倒计时（帧）
+  comboWindow: 180,     // 连击窗口 = 3秒（60fps）
+  maxCombo: 0,          // 本局最高连击
+  // 局内成长
+  xp: 0,                // 测试点数
+  level: 1,             // 当前等级
+  xpPerLevel: 24,       // 每级所需 XP 基数（Lv1→2需24≈24个普通Bug → 约2-3分钟一升）
+  levelUpReady: false,  // 是否有升级待选择
+  levelUpCooldown: 0,   // 升级冷却（帧），防止连升
+  upgradeOptions: null, // 当前升级选项
+  totalBombsPlaced: 0,
+  totalShishanCleared: 0,
 };
 
 // 搞笑死因列表
 const deathCauses = [
-  '死因：被需求变更淹没',
-  '死因：Bug太多，选择躺平',
+  '死因：被需求变更淹没，测试用例全部重写',
+  '死因：回归Bug太多，选择躺平',
   '死因：被产品经理的嘴遁击杀',
-  '死因：屎山塌方，被埋',
-  '死因：加班到猝死',
+  '死因：技术债塌方，系统崩了',
+  '死因：加班到猝死，还没发版本',
   '死因：试图一个人测完所有Bug',
   '死因：研发说"在我电脑上不会死啊"',
-  '死因：被Bug围殴',
-  '死因：用了删库跑路脚本',
-  '死因：版本发布前夜，倒下了',
+  '死因：被Bug围殴，测试环境炸了',
+  '死因：误删测试数据库',
+  '死因：版本发布前夜，P0故障亮了',
 ];
 
 // 毒舌总结 — 胜利时，基于数据生成适合截图传播的文案
 function getVictoryRoast(stats) {
   const roasts = [];
   if (stats.bugsKilled >= 15) {
-    roasts.push('🏆 Bug杀手：今天炸的Bug比产品改的需求还多');
+    roasts.push('🏆 Bug修复高手：今天修的Bug比产品改的需求还多');
   }
   if (stats.productTriggers >= 8) {
-    roasts.push('🛡️ 需求盾牌：扛住了' + stats.productTriggers + '次需求变更还没死');
+    roasts.push('🛡️ 需求变更抵抗者：扛住了' + stats.productTriggers + '次需求变更，测试用例全部重写');
   }
   if (stats.elapsed < 60) {
-    roasts.push('⚡ 闪电通关：' + Math.floor(stats.elapsed) + '秒通关，产品还没来得及写新需求');
+    roasts.push('⚡ 闪电发布：' + Math.floor(stats.elapsed) + '秒通关，产品还没来得及写新需求');
   }
   if (stats.clearRate === 100) {
-    roasts.push('🧹 屎山清道夫：100%清除率，连前同事的祖传代码都没放过');
+    roasts.push('🧹 技术债清理专家：100%清除率，连前同事的祖传代码都没放过');
   }
   if (stats.ghostKills > 0 && stats.p0Kills > 0) {
-    roasts.push('👻 P0终结者：幽灵和P0都倒在了你的炸弹下');
+    roasts.push('👻 P0终结者：回归Bug和P0故障都倒在了你的测试探针下');
   }
   if (stats.bossKills > 0) {
-    roasts.push('😈 屠Boss者：连Boss Bug都被你炸翻了，产品看了都害怕');
+    roasts.push('😈 线上事故终结者：连Boss Bug都被你修复了，产品看了都害怕');
   }
   if (roasts.length === 0) {
-    roasts.push('📝 虽然赢了，但产品已经开始写下一轮需求了');
+    roasts.push('📝 测试通过，但产品已经开始写下一轮需求了');
   }
   return roasts[Math.floor(Math.random() * roasts.length)];
 }
@@ -84,19 +99,19 @@ function getVictoryRoast(stats) {
 function getDeathRoast(stats) {
   const roasts = [];
   if (stats.remainingBugs > 10) {
-    roasts.push('💀 Bug太多，测试工程师选择了物理退出');
+    roasts.push('💀 未修复Bug太多，测试工程师选择了物理退出');
   }
   if (stats.productTriggers > 6) {
-    roasts.push('💼 被产品经理的' + stats.productTriggers + '次需求变更活活坑死');
+    roasts.push('💼 被产品经理的' + stats.productTriggers + '次需求变更活活坑死，测试用例全部白写');
   }
   if (stats.clearRate < 20) {
-    roasts.push('💩 屎山太厚，连铲子都铲不动');
+    roasts.push('💩 技术债太多，测试用例覆盖不了');
   }
   if (stats.elapsed < 30) {
     roasts.push('⏱️ 存活' + Math.floor(stats.elapsed) + '秒就没了，比需求变更还快');
   }
   if (roasts.length === 0) {
-    roasts.push('💀 别灰心，Bug还在那里不悲不喜');
+    roasts.push('💀 别灰心，Bug还在那里不悲不喜，下次继续修');
   }
   return roasts[Math.floor(Math.random() * roasts.length)];
 }
@@ -178,12 +193,50 @@ function setupInput() {
       }
     });
   }
+
+  // ? 键帮助浮层
+  document.addEventListener('keydown', function(e) {
+    if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+      // 游戏中和输入页都可以触发
+      if (Game.state === 'playing' || Game.state === 'input') {
+        toggleHelpOverlay();
+        e.preventDefault();
+      }
+    }
+  });
+
+  // 帮助浮层内按 ? 关闭
+  document.getElementById('help-overlay').addEventListener('click', function(e) {
+    if (e.target === this) toggleHelpOverlay();
+  });
+
+  // 帮助 badge 点击
+  var helpBadge = document.querySelector('.help-badge');
+  if (helpBadge) {
+    helpBadge.addEventListener('click', function(e) {
+      toggleHelpOverlay();
+      e.stopPropagation();
+    });
+  }
+}
+
+function toggleHelpOverlay() {
+  var overlay = document.getElementById('help-overlay');
+  if (!overlay) return;
+  if (overlay.style.display === 'none' || !overlay.style.display) {
+    overlay.style.display = 'flex';
+  } else {
+    overlay.style.display = 'none';
+  }
 }
 
 // ========== 快捷输入 ==========
 
 function quickInput(text) {
-  document.getElementById('world-input').value = text;
+  const input = document.getElementById('world-input');
+  const dimmedInput = document.getElementById('world-input-dimmed');
+  if (input) input.value = text;
+  if (dimmedInput) dimmedInput.value = text;
 }
 
 // ========== 编译世界 ==========
@@ -194,10 +247,10 @@ function toggleApiConfig() {
   const toggle = document.getElementById('api-config-toggle');
   if (body.style.display === 'none') {
     body.style.display = 'block';
-    toggle.textContent = '▾';
+    if (toggle) toggle.classList.add('open');
   } else {
     body.style.display = 'none';
-    toggle.textContent = '▸';
+    if (toggle) toggle.classList.remove('open');
   }
 }
 
@@ -217,7 +270,7 @@ function saveApiConfig() {
   localStorage.setItem('bugboomer_api_model', model);
 
   Compiler.setConfig(url, key, model);
-  updateApiStatusLabel('AI 接口：已配置 ✓（' + model + '）', '#4ade80');
+  updateApiStatusLabel('AI 接口：已配置 ✓（' + model + '）', '#10B981');
 }
 
 // 清除 API 配置
@@ -231,7 +284,7 @@ function clearApiConfig() {
   document.getElementById('api-model').value = '';
 
   Compiler.setConfig('', '', '');
-  updateApiStatusLabel('AI 接口：未配置（使用离线规则）', '#94a3b8');
+  updateApiStatusLabel('AI 接口：未配置（当前使用离线规则包）', '#94a3b8');
 }
 
 // 更新状态标签
@@ -244,7 +297,7 @@ function updateApiStatusLabel(text, color) {
 // 页面加载时恢复 API 配置显示
 function restoreApiConfig() {
   if (Compiler.isConfigured()) {
-    updateApiStatusLabel('AI 接口：已配置 ✓（' + Compiler.model + '）', '#4ade80');
+    updateApiStatusLabel('AI 接口：已配置 ✓（' + Compiler.model + '）', '#10B981');
     document.getElementById('api-url').value = Compiler.apiUrl;
     document.getElementById('api-model').value = Compiler.model;
   }
@@ -252,20 +305,41 @@ function restoreApiConfig() {
 
 function setCompileControlsBusy(isBusy, buttonText) {
   const compileBtn = document.getElementById('compile-btn');
+  const recompileInline = document.getElementById('recompile-inline-btn');
   const recompileBtn = document.getElementById('recompile-btn');
   const startBtn = document.getElementById('start-btn');
 
-  compileBtn.disabled = isBusy;
-  compileBtn.textContent = isBusy ? buttonText : '编译世界';
-
+  if (compileBtn) {
+    compileBtn.disabled = isBusy;
+    compileBtn.textContent = isBusy ? buttonText : '编译世界';
+  }
+  if (recompileInline) recompileInline.disabled = isBusy;
   if (recompileBtn) recompileBtn.disabled = isBusy;
   if (startBtn) startBtn.disabled = isBusy || !Game.pendingRuleData;
 }
 
-function togglePostCompileActions(show) {
-  const actions = document.getElementById('post-compile-actions');
-  if (actions) {
-    actions.style.display = show ? 'flex' : 'none';
+function showCompileResultZone(show) {
+  const resultZone = document.getElementById('compile-result-zone');
+  if (resultZone) {
+    resultZone.style.display = show ? 'block' : 'none';
+  }
+}
+
+function showInputDimmedZone(show) {
+  const pureZone = document.getElementById('input-pure-zone');
+  const dimmedZone = document.getElementById('input-dimmed-zone');
+  if (!pureZone || !dimmedZone) return;
+
+  if (show) {
+    pureZone.style.display = 'none';
+    dimmedZone.style.display = 'block';
+    // 同步输入值
+    const input = document.getElementById('world-input');
+    const dimmedInput = document.getElementById('world-input-dimmed');
+    if (input && dimmedInput) dimmedInput.value = input.value;
+  } else {
+    pureZone.style.display = '';
+    dimmedZone.style.display = 'none';
   }
 }
 
@@ -279,8 +353,8 @@ function updateCompileExtraTip(ruleData) {
   }
 
   if (ruleData.rawJson) {
-    tip.textContent = '你可以点击“重新编译”对比同一句输入在 AI 模型下生成的不同规则。';
-    tip.style.color = '#64748b';
+    tip.textContent = '你可以点击"重新编译"对比同一句输入在 AI 模型下生成的不同规则。';
+    tip.style.color = '#64748B';
     return;
   }
 
@@ -288,47 +362,89 @@ function updateCompileExtraTip(ruleData) {
   tip.style.color = '#fbbf24';
 }
 
-function renderCompileStatus(ruleData) {
-  const status = document.getElementById('compile-status');
-  status.textContent = '';
-  status.style.color = '#4ade80';
+function renderCompileResult(ruleData) {
+  const preview = document.getElementById('compile-rule-preview');
+  if (!preview) return;
+  preview.innerHTML = '';
 
-  if (!ruleData || !ruleData.isHidden) {
-    status.textContent = '世界编译完成！可以先看规则，再决定是否开打。';
-    return;
-  }
+  if (!ruleData || !ruleData.rules || ruleData.rules.length === 0) return;
 
-  status.appendChild(document.createTextNode('✨ 触发隐藏规则：'));
-  const worldName = document.createElement('b');
-  worldName.style.color = '#a78bfa';
-  worldName.textContent = ruleData.worldName || '未知世界';
-  status.appendChild(worldName);
-  status.appendChild(document.createTextNode(' ✨'));
+  ruleData.rules.forEach(function(rule) {
+    var item = document.createElement('div');
+    item.className = 'rule-item';
+
+    var nameDiv = document.createElement('div');
+    nameDiv.className = 'rule-item-name';
+    nameDiv.textContent = rule.name || rule.label || '';
+    item.appendChild(nameDiv);
+
+    if (rule.parsedLabel) {
+      var parsedDiv = document.createElement('div');
+      parsedDiv.className = 'rule-item-parsed';
+      parsedDiv.textContent = rule.parsedLabel;
+      item.appendChild(parsedDiv);
+    } else if (rule.effect) {
+      var effectDiv = document.createElement('div');
+      effectDiv.className = 'rule-item-effect';
+      effectDiv.textContent = rule.effect;
+      item.appendChild(effectDiv);
+    }
+
+    if (rule.impact) {
+      var impactDiv = document.createElement('div');
+      impactDiv.className = 'rule-item-impact';
+      impactDiv.textContent = rule.impact;
+      item.appendChild(impactDiv);
+    }
+
+    preview.appendChild(item);
+  });
 }
 
 function applyCompiledWorld(input, ruleData) {
   Game.lastInput = input;
   Game.pendingRuleData = ruleData;
 
-  renderCompileStatus(ruleData);
+  // 更新状态文字
+  var statusText = document.getElementById('compile-status-text');
+  if (statusText) {
+    if (ruleData && ruleData.isHidden) {
+      statusText.textContent = '✨ 触发隐藏规则：' + (ruleData.worldName || '未知世界') + ' ✨';
+      statusText.style.color = '#a78bfa';
+    } else {
+      statusText.textContent = '世界编译完成';
+      statusText.style.color = '#10B981';
+    }
+  }
+
+  // 切换到编译完成状态：灰化输入区 + 展开结果
+  showInputDimmedZone(true);
+  showCompileResultZone(true);
+  renderCompileResult(ruleData);
+
+  // 同步规则到引擎和右侧面板
   RuleEngine.applyRules(ruleData);
   Panel.update(ruleData);
-  togglePostCompileActions(true);
+
   updateCompileExtraTip(ruleData);
   setCompileControlsBusy(false, '编译世界');
 }
 
 async function compileWorld(options = {}) {
   const input = (options.inputOverride || document.getElementById('world-input').value).trim();
-  const status = document.getElementById('compile-status');
+  const statusText = document.getElementById('compile-status-text');
 
   if (!input) {
-    status.textContent = '请输入一句话描述你的项目状态';
-    status.style.color = '#f87171';
+    showCompileResultZone(true);
+    var preview = document.getElementById('compile-rule-preview');
+    if (preview) preview.innerHTML = '';
+    if (statusText) {
+      statusText.textContent = '请输入一句话描述你的项目状态';
+      statusText.style.color = '#f87171';
+    }
     return;
   }
 
-  status.textContent = '';
   setCompileControlsBusy(true, options.fastMode ? '重编译中...' : '编译中...');
 
   // 启动世界编译动画
@@ -336,8 +452,13 @@ async function compileWorld(options = {}) {
     if (ruleData) {
       applyCompiledWorld(input, ruleData);
     } else {
-      status.textContent = '编译失败，请重试';
-      status.style.color = '#f87171';
+      showCompileResultZone(true);
+      var preview = document.getElementById('compile-rule-preview');
+      if (preview) preview.innerHTML = '';
+      if (statusText) {
+        statusText.textContent = '编译失败，请重试';
+        statusText.style.color = '#f87171';
+      }
       setCompileControlsBusy(false, '编译世界');
     }
   }, options);
@@ -349,10 +470,12 @@ function recompileWorld() {
 }
 
 function beginBattle() {
-  const status = document.getElementById('compile-status');
   if (!Game.pendingRuleData) {
-    status.textContent = '请先编译一个世界规则包';
-    status.style.color = '#f87171';
+    const statusText = document.getElementById('compile-status-text');
+    if (statusText) {
+      statusText.textContent = '请先编译一个世界规则包';
+      statusText.style.color = '#f87171';
+    }
     return;
   }
 
@@ -375,14 +498,14 @@ function showCompileAnimation(input, callback, options = {}) {
   bar.style.width = '0%';
   percentDiv.textContent = '0%';
 
-  // 编译步骤文案 — 仪式感
+  // 编译步骤文案 — 测试部扫描发现仪式感
   const steps = [
-    { text: '> 解析项目黑话...', delay: 0 },
-    { text: '> 识别关键词："' + input + '"', delay: Math.round(300 * speedMultiplier) },
-    { text: '> 召唤产品行为模型...', delay: Math.round(600 * speedMultiplier) },
-    { text: '> 注入研发失控模块...', delay: Math.round(900 * speedMultiplier) },
-    { text: '> 计算屎山增长曲线...', delay: Math.round(1200 * speedMultiplier) },
-    { text: '> 生成世界规则...', delay: Math.round(1500 * speedMultiplier) },
+    { text: '> \u{1F50D} \u626B\u63CF\u6D4B\u8BD5\u533A\u57DF...', delay: 0 },
+    { text: '> \u8BC6\u522B\u9879\u76EE\u7279\u5F81\uFF1A"' + input + '"', delay: Math.round(300 * speedMultiplier) },
+    { text: '> \u{1F41B} \u53D1\u73B0 Bug \u6D3B\u52A8\u8FF9\u8C61\uFF01', delay: Math.round(600 * speedMultiplier) },
+    { text: '> \u{1F4A9} \u5C4E\u5C71\u533A\u57DF\u5DF2\u6807\u8BB0\uFF01', delay: Math.round(900 * speedMultiplier) },
+    { text: '> \u2699\uFE0F \u6B63\u5728\u7F16\u8BD1\u4E16\u754C\u89C4\u5219...', delay: Math.round(1200 * speedMultiplier) },
+    { text: '> \u26A1 \u4E16\u754C\u7F16\u8BD1\u5B8C\u6210 \u2713', delay: Math.round(1500 * speedMultiplier) },
   ];
 
   // 逐行显示
@@ -429,9 +552,9 @@ function showCompileAnimation(input, callback, options = {}) {
 
     const doneLine = document.createElement('div');
     doneLine.className = 'compile-line active';
-    doneLine.style.color = '#4ade80';
+    doneLine.style.color = '#10B981';
     doneLine.style.fontWeight = '700';
-    doneLine.textContent = '> 世界编译完成 ✓';
+    doneLine.textContent = '> \u26A1 \u4E16\u754C\u7F16\u8BD1\u5B8C\u6210 \u2713';
     linesDiv.appendChild(doneLine);
 
     bar.style.width = '100%';
@@ -472,6 +595,7 @@ function startGame() {
   Bomb.init();
   Pickup.init();
   RuleEngine.refreshSystems();
+  Characters.init();
 
   // 评委试玩模式 — 首局降低难度
   const isFirstGame = !localStorage.getItem('bugboomer_played');
@@ -481,7 +605,7 @@ function startGame() {
     Game.ghostInterval = 2400;  // 40秒（原30秒）
     Game.crashInterval = 3000;  // 50秒（原40秒）
     Game.p0Interval = 4800;     // 80秒（原60秒）
-    Game.bossInterval = 7200;   // 120秒（原90秒）
+    Game.bossInterval = 4800;   // 80秒（首局降低难度）
     Pickup.dropChance = 0.28;   // 28%（原18%）
     localStorage.setItem('bugboomer_played', '1');
     console.log('[评委试玩模式] 首局难度已降低');
@@ -503,6 +627,16 @@ function startGame() {
   Game.totalKills = 0;
   Game.productTriggers = 0;
   Game.devTriggers = 0;
+  Game.combo = 0;
+  Game.comboTimer = 0;
+  Game.maxCombo = 0;
+  Game.xp = 0;
+  Game.level = 1;
+  Game.levelUpReady = false;
+  Game.levelUpCooldown = 0;
+  Game.upgradeOptions = null;
+  Game.totalBombsPlaced = 0;
+  Game.totalShishanCleared = 0;
   Game.startTime = performance.now();
   Game.ghostSpawnTimer = 0;
   Game.crashSpawnTimer = 0;
@@ -511,6 +645,7 @@ function startGame() {
   Game.idleTimer = 0;
   Game.bugWaveTimer = 0;
   Game.bugWaveTriggered = false;
+  Game.lastBugTriggered = false;
 
   // 战场引导提示 — 前30秒逐步出现
   Game.hintQueue = [
@@ -538,7 +673,11 @@ function startGame() {
 
 function gameLoop(timestamp) {
   if (Game.state !== 'playing') {
-    // 非游戏中状态直接停止循环
+    // levelup 状态时继续渲染但不更新逻辑
+    if (Game.state === 'levelup') {
+      Renderer.render();
+      requestAnimationFrame(gameLoop);
+    }
     return;
   }
 
@@ -552,13 +691,31 @@ function gameLoop(timestamp) {
   DeveloperSystem.update();
   ShishanSystem.update();
   Effects.update();
+  Characters.update();
   spawnSpecialBugs();
 
   // Bug 浪潮 — 每 45 秒触发一次"一大波Bug正在奔来"
+  // Bug 浪潮冷却 — 升级后 10 秒内不触发
   Game.bugWaveTimer++;
-  if (Game.bugWaveTimer >= Game.bugWaveInterval && Enemy.count() < 10) {
+  if (Game.bugWaveTimer >= Game.bugWaveInterval && Enemy.count() < 10 && Game.levelUpCooldown <= 0) {
     Game.bugWaveTimer = 0;
     Effects.bugWave();
+  }
+
+  // 升级冷却递减
+  if (Game.levelUpCooldown > 0) {
+    Game.levelUpCooldown--;
+  }
+
+  // 最后一只Bug — 首次触发时弹出横幅
+  if (!Game.lastBugTriggered && Enemy.count() === 1 && Enemy.list.filter(e => e.alive && e.type !== 'boss').length === 1) {
+    Game.lastBugTriggered = true;
+    Effects.banner('🎯 最后一个Bug！炸掉它就赢了！');
+    Sound.play('alert');
+  }
+  // Bug数恢复到>1时重置标记
+  if (Enemy.count() > 1) {
+    Game.lastBugTriggered = false;
   }
 
   // 战场引导提示
@@ -578,6 +735,18 @@ function gameLoop(timestamp) {
     Game.idleTimer = 0;
   }
 
+  // 连击计时器衰减
+  if (Game.comboTimer > 0) {
+    Game.comboTimer--;
+    if (Game.comboTimer === 0 && Game.combo > 0) {
+      // 连击断了
+      if (Game.combo >= 3) {
+        Effects.floatText('💔 Combo 断了！产品松了口气', 273, 200, '#94a3b8');
+      }
+      Game.combo = 0;
+    }
+  }
+
   Renderer.render();
 
   if (Game.frameCount % 10 === 0) {
@@ -587,6 +756,126 @@ function gameLoop(timestamp) {
   checkWinCondition();
 
   requestAnimationFrame(gameLoop);
+}
+
+// ========== 系统稳定度计算 ==========
+
+function getSystemStability() {
+  const destroyed = GameMap.destroyedShishan;
+  // 基础50 + 每杀1只Bug+2 + 每炸1座屎山+2 - 每次需求变更-4
+  // 比原公式更公平：不再惩罚"场上还有屎山"（那是游戏内容），而是奖励"已炸掉的屎山"
+  const stability = 50 + Game.totalKills * 2 + destroyed * 2 - Game.productTriggers * 4;
+  return Math.max(0, Math.min(100, stability));
+}
+
+// ========== 局内成长 — 升级选择 UI ==========
+
+function showLevelUpUI() {
+  Game.state = 'levelup';
+  Game.levelUpReady = false;
+
+  // 随机3选2的升级选项
+  const allOptions = [
+    { id: 'range', icon: '💥', name: '爆炸范围 +1', desc: '测试覆盖更广', apply() { if (Player.bombRange < 6) Player.bombRange++; } },
+    { id: 'speed', icon: '⚡', name: '移动速度 +10%', desc: '在Bug中穿梭自如', apply() { if (Player.baseSpeed < 6) Player.baseSpeed += 0.4; Player.speed = Player.baseSpeed * Player.speedMultiplier; } },
+    { id: 'bombs', icon: '💣', name: '可放置炸弹 +1', desc: '同时扔更多测试用例', apply() { Player.maxBombs = Math.min(5, Player.maxBombs + 1); } },
+    { id: 'lives', icon: '❤️', name: '生命 +1', desc: 'HR说给你多买一份社保', apply() { Player.lives = Math.min(5, Player.lives + 1); } },
+  ];
+
+  // 随机抽取2个
+  const shuffled = [...allOptions].sort(() => Math.random() - 0.5);
+  const options = shuffled.slice(0, 2);
+
+  // 创建升级弹窗
+  const overlay = document.createElement('div');
+  overlay.id = 'levelup-overlay';
+  overlay.style.cssText = `
+    position:fixed;top:0;left:0;width:100%;height:100%;
+    background:rgba(0,0,0,0.75);z-index:100;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-family:'Courier New',monospace;
+  `;
+
+  overlay.innerHTML = `
+    <div style="font-size:28px;color:#f59e0b;font-weight:bold;margin-bottom:8px;text-shadow:0 0 20px rgba(245,158,11,0.5);">
+      ⭐ Lv.${Game.level} → Lv.${Game.level + 1} 晋级！
+    </div>
+    <div style="font-size:14px;color:#94a3b8;margin-bottom:24px;">
+      选择一个升级方向
+    </div>
+    <div style="display:flex;gap:16px;">
+      ${options.map((opt, i) => `
+        <button class="levelup-opt" data-id="${opt.id}" style="
+          background:#1E293B;border:2px solid #334155;border-radius:12px;
+          padding:20px 24px;cursor:pointer;text-align:center;
+          color:#e2e8f0;font-family:'Courier New',monospace;
+          transition:all 0.2s;min-width:160px;
+        ">
+          <div style="font-size:36px;margin-bottom:8px;">${opt.icon}</div>
+          <div style="font-size:16px;font-weight:bold;margin-bottom:4px;">${opt.name}</div>
+          <div style="font-size:12px;color:#64748b;">${opt.desc}</div>
+        </button>
+      `).join('')}
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  // 点击处理
+  overlay.querySelectorAll('.levelup-opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      const chosen = options.find(o => o.id === id);
+      if (chosen) {
+        chosen.apply();
+        Game.xp -= Game.level * Game.xpPerLevel;
+        Game.level++;
+        Game.levelUpCooldown = 600;  // 10秒冷却，防连升
+
+        // 升级飘字
+        Effects.floatText('\u2B50 Lv.' + Game.level + ' \u664B\u7EA7\uFF01' + chosen.name,
+          273, 273, '#f59e0b');
+        Effects.flashBorder();
+        Sound.play('victory');
+
+        overlay.remove();
+        Game.state = 'playing';
+        // 不需要 requestAnimationFrame — gameLoop 在 levelup 期间持续运行，会自动恢复
+      }
+    });
+
+    // hover 效果
+    btn.addEventListener('mouseenter', () => { btn.style.borderColor = '#f59e0b'; btn.style.transform = 'translateY(-2px)'; btn.style.boxShadow = '0 4px 16px rgba(245,158,11,0.3)'; });
+    btn.addEventListener('mouseleave', () => { btn.style.borderColor = '#334155'; btn.style.transform = ''; btn.style.boxShadow = ''; });
+  });
+
+  // 8秒超时自动随机选择，防止卡死
+  let timedOut = false;
+  const autoPick = setTimeout(() => {
+    if (timedOut || Game.state !== 'levelup') return;
+    timedOut = true;
+    const random = options[Math.floor(Math.random() * options.length)];
+    random.apply();
+    Game.xp -= Game.level * Game.xpPerLevel;
+    Game.level++;
+    Game.levelUpCooldown = 600;  // 10秒冷却，防连升
+    Effects.floatText('\u2B50 Lv.' + Game.level + ' \u664B\u7EA7\uFF01' + random.name,
+      273, 273, '#f59e0b');
+    Effects.flashBorder();
+    Sound.play('victory');
+    overlay.remove();
+    Game.state = 'playing';
+    // 不需要 requestAnimationFrame — gameLoop 在 levelup 期间持续运行，会自动恢复
+  }, 8000);
+
+  // 点击选择时取消超时
+  const origClick = overlay.querySelector('.levelup-opt');
+  if (origClick) {
+    const cancelTimer = () => { timedOut = true; clearTimeout(autoPick); };
+    overlay.querySelectorAll('.levelup-opt').forEach(b => {
+      b.addEventListener('click', cancelTimer, { once: true });
+    });
+  }
 }
 
 // ========== 胜负检查 ==========
@@ -602,8 +891,10 @@ function checkWinCondition() {
 
   const bugCount = Enemy.count();
   const clearRate = GameMap.getClearRate();
+  const stability = getSystemStability();
 
-  if (bugCount === 0 && clearRate >= 0.7) {
+  // 胜利条件：稳定度≥95%，或传统条件（无Bug且清理率≥70%）
+  if (stability >= 95 || (bugCount === 0 && clearRate >= 0.7)) {
     Game.state = 'won';
     showEndScreen(true);
   }
@@ -615,9 +906,9 @@ function spawnSpecialBugs() {
   Game.ghostSpawnTimer++;
   if (Game.ghostSpawnTimer >= Game.ghostInterval) {
     Game.ghostSpawnTimer = 0;
-    if (Enemy.countByType('ghost') < 2 && Enemy.count() < 12) {
+    if (Enemy.countByType('ghost') < 2 && Enemy.count() < Enemy.maxAlive - 1) {
       Enemy.spawn('ghost');
-      Effects.banner('\u{1F47B} \u5E7D\u7075Bug\u73B0\u8EAB\u4E86\uFF01\u5B83\u80FD\u7A7F\u5899\uFF01');
+      Effects.banner('👻 幽灵Bug现身了！它能穿墙！');
       Danmaku.show('product');
       Roast.trigger('specialBug');
     }
@@ -627,9 +918,9 @@ function spawnSpecialBugs() {
   Game.crashSpawnTimer++;
   if (Game.crashSpawnTimer >= Game.crashInterval) {
     Game.crashSpawnTimer = 0;
-    if (Enemy.countByType('crash') < 2 && Enemy.count() < 12) {
+    if (Enemy.countByType('crash') < 2 && Enemy.count() < Enemy.maxAlive - 1) {
       Enemy.spawn('crash');
-      Effects.banner('\u{1F4A5} \u6B7B\u673ABug\u51FA\u73B0\u4E86\uFF01\u5FEB\u53BB\u70B8\u6389\u5B83\uFF01\u4E0D\u7136\u4F1A\u7206\u70B8\uFF01');
+      Effects.banner('💥 死机Bug出现了！快去炸掉它！不然会爆炸！');
       Sound.play('alert');
       Roast.trigger('specialBug');
     }
@@ -639,32 +930,34 @@ function spawnSpecialBugs() {
   Game.p0SpawnTimer++;
   if (Game.p0SpawnTimer >= Game.p0Interval) {
     Game.p0SpawnTimer = 0;
-    if (Enemy.countByType('p0') < 1 && Enemy.count() < 12) {
+    if (Enemy.countByType('p0') < 1 && Enemy.count() < Enemy.maxAlive - 1) {
       Enemy.spawn('p0');
-      Effects.banner('\u{1F525} P0 Bug\u6765\u4E86\uFF01\u9700\u8981\u70B8\u4E24\u6B21\u624D\u80FD\u6740\u6389\uFF01');
+      Effects.banner('🔥 P0 Bug来了！需要炸两次才能杀掉！');
       Sound.play('alert');
       Roast.trigger('specialBug');
     }
   }
 
-  // Boss Bug — 每 90 秒生成一个，带出场动画
+  // Boss Bug — 默认每 60 秒尝试生成，条件不满足时 30 秒后重试
   Game.bossSpawnTimer++;
   if (Game.bossSpawnTimer >= Game.bossInterval) {
-    Game.bossSpawnTimer = 0;
-    if (Enemy.countByType('boss') < 1 && Enemy.count() < 10) {
-      // Boss 出场动画 — 屏幕变暗 + 邪恶红光 + 震动
+    if (Enemy.countByType('boss') < 1 && Enemy.count() < Enemy.maxAlive - 2) {
+      // 条件满足 — 生成 Boss
+      Game.bossSpawnTimer = 0;
       Effects.bossSpawn();
       Sound.play('bossSpawn');
 
-      // 延迟1.5秒后生成Boss（让动画播完）
       setTimeout(() => {
         if (Game.state !== 'playing') return;
         Enemy.spawn('boss');
-        Effects.banner('\u{1F608} Boss Bug \u964D\u4E34\u4E86\uFF01\u9700\u8981\u70B8\u4E09\u6B21\uFF01\u5C0F\u5FC3\u5B83\u7684\u90AA\u7B11\uFF01');
+        Effects.banner('😈 Boss Bug 降临了！需要炸三次！小心它的邪笑！');
         Danmaku.show('dev');
         Danmaku.show('dev');
         Roast.trigger('specialBug');
       }, 1500);
+    } else {
+      // 条件不满足 — 保留一半进度，30 秒后重试
+      Game.bossSpawnTimer = Math.floor(Game.bossInterval / 2);
     }
   }
 }
@@ -686,6 +979,7 @@ function showEndScreen(won) {
   const seconds = elapsed % 60;
   const clearRate = Math.floor(GameMap.getClearRate() * 100);
   const bugsKilled = Enemy.spawnCount - Enemy.count();
+  const stability = getSystemStability();
   const worldName = RuleEngine.currentRules ? RuleEngine.currentRules.worldName : '未知';
   // 安全转义 — 防止 AI 返回恶意 HTML
   const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
@@ -693,13 +987,13 @@ function showEndScreen(won) {
 
   if (won) {
     const victoryMsgs = [
-      'Bug 全部清零，屎山清除率达标。你的奖励是：明天继续上班。',
-      '版本发布成功！产品已经开始写下一轮需求了。',
+      '所有测试用例通过，技术债已清零。你的奖励是：明天继续上班。',
+      '系统稳定度达标，版本发布成功！产品已经开始写下一轮需求了。',
       '你活下来了！HR说：太好了，不用招新人了。',
-      '恭喜通关！你的奖励是：更多的Bug等着你。',
+      '恭喜通关！系统稳定度 ' + stability + '%，所有Bug已修复。',
     ];
-    title.textContent = '\u{1F389} \u7248\u672C\u53D1\u5E03\u6210\u529F\uFF01';
-    title.style.color = '#4ade80';
+    title.textContent = '🎉 测试通过，发布成功！';
+    title.style.color = '#10B981';
     message.textContent = victoryMsgs[Math.floor(Math.random() * victoryMsgs.length)];
     Danmaku.showBatch('victory', 3);
     Sound.play('victory');
@@ -718,38 +1012,43 @@ function showEndScreen(won) {
     statsDiv.innerHTML = `
       <div class="end-stat">
         <div class="end-stat-value">${minutes}:${seconds.toString().padStart(2, '0')}</div>
-        <div class="end-stat-label">\u5B58\u6D3B\u65F6\u95F4</div>
+        <div class="end-stat-label">存活时间</div>
       </div>
       <div class="end-stat">
         <div class="end-stat-value">${bugsKilled}</div>
-        <div class="end-stat-label">Bug\u5DF2\u6D88\u706D</div>
+        <div class="end-stat-label">Bug已修复</div>
       </div>
       <div class="end-stat">
         <div class="end-stat-value">${clearRate}%</div>
-        <div class="end-stat-label">\u5C4E\u5C71\u6E05\u9664\u7387</div>
+        <div class="end-stat-label">技术债清除率</div>
+      </div>
+      <div class="end-stat">
+        <div class="end-stat-value" style="color:#10B981">${stability}%</div>
+        <div class="end-stat-label">系统稳定度</div>
       </div>
       <div class="end-stat">
         <div class="end-stat-value" style="color:#fbbf24">${Game.productTriggers}</div>
-        <div class="end-stat-label">\u8EB2\u8FC7\u9700\u6C42\u53D8\u66F4</div>
+        <div class="end-stat-label">需求变更次数</div>
       </div>
       <div class="end-stat">
         <div class="end-stat-value" style="color:#a78bfa">${Enemy.killStats.ghost}</div>
-        <div class="end-stat-label">\u5E7D\u7075Bug</div>
+        <div class="end-stat-label">回归Bug</div>
       </div>
       <div class="end-stat">
         <div class="end-stat-value" style="color:#ef4444">${Enemy.killStats.p0}</div>
-        <div class="end-stat-label">P0 Bug</div>
+        <div class="end-stat-label">P0 故障</div>
       </div>
       <div class="end-stat">
         <div class="end-stat-value" style="color:#DC2626">${Enemy.killStats.boss}</div>
-        <div class="end-stat-label">Boss Bug</div>
+        <div class="end-stat-label">线上事故</div>
       </div>
       <div style="width:100%;margin-top:12px;padding:12px;background:#0f172a;border-radius:8px;font-size:13px;color:#94a3b8;line-height:1.8;text-align:left;">
-        <div style="color:#4ade80;font-weight:700;margin-bottom:6px;">📋 \u6218\u62A5</div>
-        \u4E16\u754C\uFF1A${safeWorldName}<br>
-        \u7814\u53D1\u5199Bug\u6B21\u6570\uFF1A${Game.devTriggers}<br>
-        \u4EA7\u54C1\u6539\u9700\u6C42\u6B21\u6570\uFF1A${Game.productTriggers}<br>
-        \u8BC4\u4EF7\uFF1A${bugsKilled >= 10 ? '\u6D4B\u8BD5\u4E4B\u795E\uFF01\u5C31\u662F\u4F60\u4E86' : bugsKilled >= 5 ? '\u5408\u683C\u7684\u6D4B\u8BD5\u5DE5\u7A0B\u5E08' : '\u52C9\u5F3A\u53D1\u5E03\uFF0C\u4E0B\u6B21\u52AA\u529B'}
+        <div style="color:#10B981;font-weight:700;margin-bottom:6px;">📋 测试报告</div>
+        世界：${safeWorldName}<br>
+        研发引入Bug次数：${Game.devTriggers}<br>
+        产品需求变更次数：${Game.productTriggers}<br>
+        最终稳定度：${stability}%<br>
+        评价：${bugsKilled >= 10 ? '测试之神！就是你了' : bugsKilled >= 5 ? '合格的测试工程师' : '勉强发布，下次努力'}
       </div>
       <div style="width:100%;margin-top:8px;padding:10px 14px;background:linear-gradient(135deg,#1a1a2e,#2a1a3e);border:1px solid #a78bfa;border-radius:8px;font-size:14px;color:#a78bfa;font-weight:600;text-align:center;">
         💬 ${roastText}
@@ -785,27 +1084,32 @@ function showEndScreen(won) {
     statsDiv.innerHTML = `
       <div class="end-stat">
         <div class="end-stat-value">${minutes}:${seconds.toString().padStart(2, '0')}</div>
-        <div class="end-stat-label">\u5B58\u6D3B\u65F6\u95F4</div>
+        <div class="end-stat-label">存活时间</div>
       </div>
       <div class="end-stat">
         <div class="end-stat-value" style="color:#f87171">${bugsKilled}</div>
-        <div class="end-stat-label">Bug\u5DF2\u6D88\u706D</div>
+        <div class="end-stat-label">Bug已修复</div>
       </div>
       <div class="end-stat">
         <div class="end-stat-value" style="color:#fbbf24">${clearRate}%</div>
-        <div class="end-stat-label">\u5C4E\u5C71\u6E05\u9664\u7387</div>
+        <div class="end-stat-label">技术债清除率</div>
       </div>
       <div class="end-stat">
         <div class="end-stat-value" style="color:#ef4444">${remainingBugs}</div>
-        <div class="end-stat-label">\u6B8B\u4F59Bug</div>
+        <div class="end-stat-label">未修复Bug</div>
+      </div>
+      <div class="end-stat">
+        <div class="end-stat-value" style="color:#10B981">${stability}%</div>
+        <div class="end-stat-label">系统稳定度</div>
       </div>
       <div style="width:100%;margin-top:12px;padding:12px;background:#0f172a;border-radius:8px;font-size:13px;color:#94a3b8;line-height:1.8;text-align:left;">
-        <div style="color:#f87171;font-weight:700;margin-bottom:6px;">\u{1F50D} \u590D\u76D8\u5206\u6790</div>
-        \u6B7B\u56E0\uFF1A${deathAnalysis}<br>
-        \u4E16\u754C\uFF1A${safeWorldName}<br>
-        \u4EA7\u54C1\u6539\u9700\u6C42\u6B21\u6570\uFF1A${Game.productTriggers}<br>
-        \u7814\u53D1\u5199Bug\u6B21\u6570\uFF1A${Game.devTriggers}<br>
-        \u6B8B\u4F59\u5C4E\u5C71\uFF1A${remainingShishan} \u5757
+        <div style="color:#f87171;font-weight:700;margin-bottom:6px;">🔍 故障复盘</div>
+        死因：${deathAnalysis}<br>
+        世界：${safeWorldName}<br>
+        产品需求变更次数：${Game.productTriggers}<br>
+        研发引入Bug次数：${Game.devTriggers}<br>
+        剩余技术债：${remainingShishan} 块<br>
+        最终稳定度：${stability}%
       </div>
       <div style="width:100%;margin-top:8px;padding:10px 14px;background:linear-gradient(135deg,#1a1a2e,#2a1a1e);border:1px solid #f87171;border-radius:8px;font-size:14px;color:#f87171;font-weight:600;text-align:center;">
         💬 ${roastText}
@@ -822,17 +1126,23 @@ function restartGame() {
   document.getElementById('input-screen').classList.add('active');
   document.getElementById('game-screen').classList.remove('active');
 
-  // 2. 重置输入和编译状态
-  document.getElementById('world-input').value = '';
-  document.getElementById('compile-status').textContent = '';
-  document.getElementById('compile-status').style.color = '';
-  document.getElementById('compile-extra-tip').textContent = '';
-  togglePostCompileActions(false);
+  // 2. 重置输入和编译状态（双区设计）
+  const input = document.getElementById('world-input');
+  const dimmedInput = document.getElementById('world-input-dimmed');
+  if (input) input.value = '';
+  if (dimmedInput) dimmedInput.value = '';
 
-  // 3. 重置编译按钮状态（关键！防止卡在"编译中"）
+  const extraTip = document.getElementById('compile-extra-tip');
+  if (extraTip) extraTip.textContent = '';
+
+  // 回到未编译状态
+  showInputDimmedZone(false);
+  showCompileResultZone(false);
+
+  // 3. 重置编译按钮状态
   setCompileControlsBusy(false, '编译世界');
 
-  // 4. 隐藏编译动画 overlay（防止动画卡住）
+  // 4. 隐藏编译动画 overlay
   const overlay = document.getElementById('compile-overlay');
   if (overlay) {
     overlay.style.display = 'none';
@@ -843,14 +1153,11 @@ function restartGame() {
   Game.lastInput = '';
   Game.pendingRuleData = null;
 
-  // 6. 重置规则引擎
-  RuleEngine.init();
-  RuleEngine.currentRules = null;  // 确保清空当前规则
+  // 6. 重置规则引擎（不清空 currentRules，因为重新编译世界会重新应用）
+  RuleEngine.resetConfig();
 
   // 7. 更新规则面板
   Panel.update(null);
-
-  console.log('[restartGame] 游戏已重置，可以重新编译');
 }
 
 // ========== 启动 ==========
@@ -884,7 +1191,7 @@ window.addEventListener('DOMContentLoaded', () => {
     if (!Intro.canvas) startIntro();
   });
 
-  console.log('BugBoomer 已启动');
+  console.log('BugBomber 已启动');
   console.log('提示：在 js/ai/compiler.js 中配置 API key 以启用 AI 规则生成');
   console.log('未配置 API 时将使用离线兜底规则包');
 });

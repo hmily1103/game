@@ -9,12 +9,13 @@ const DeveloperSystem = {
   init() {
     this.interval = RuleEngine.config.devSpawnDelay;
     this.spawnPerCycle = RuleEngine.config.devSpawnCount;
-    // 第一次触发提前到 1/3 时间，让前30秒有节奏感
-    this.timer = Math.min(this.interval * 20, this.interval * 60);
+    // 第一次触发为完整间隔，给玩家适应时间
+    this.timer = this.interval * 60;
     this.active = true;
   },
 
   update() {
+    if (Game.state !== 'playing') return;
     if (!this.active) return;
 
     this.timer--;
@@ -32,6 +33,7 @@ const DeveloperSystem = {
 
     // 随机搞笑横幅
     Effects.randomDevBanner();
+    Effects.flashBorder('dev');
     Danmaku.show('dev');
     Sound.play('devSpawn');
 
@@ -45,5 +47,15 @@ const DeveloperSystem = {
       '研发：先上线再说，Bug后面再修',
     ];
     Effects.banner('👨\u200d💻 ' + devQuotes[Math.floor(Math.random() * devQuotes.length)]);
+
+    // 角色动画 — DEV 举手 + 气泡
+    const devLines = [
+      '又写了新Bug~', '在我这能跑啊', '别怕加了try-catch',
+      '这是特性不是Bug', '上线再说！', '新功能写好了~',
+    ];
+    Characters.devAction(devLines[Math.floor(Math.random() * devLines.length)]);
+
+    // 下次触发加随机抖动 — 更像"系统失控"而非定时器
+    this.timer = (this.interval + (Math.random() - 0.5) * 4) * 60;
   },
 };

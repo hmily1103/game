@@ -551,7 +551,7 @@ const Intro = {
       ctx.font = '10px "Microsoft YaHei", sans-serif';
       ctx.textAlign = 'left';
       ctx.fillStyle = '#4ade80';
-      ctx.fillText('> BugBoomer v1.0', monX + 10, monY + 20);
+      ctx.fillText('> BugBomber v1.0', monX + 10, monY + 20);
 
       if (this.screenBrightness > 0.3) {
         const alpha2 = Math.min(1, (this.screenBrightness - 0.3) / 0.3);
@@ -574,7 +574,7 @@ const Intro = {
         ctx.font = 'bold 20px "Microsoft YaHei", sans-serif';
         ctx.fillStyle = '#4ade80';
         ctx.textAlign = 'center';
-        ctx.fillText('BugBoomer', monX + monW / 2, monY + 80);
+        ctx.fillText('BugBomber', monX + monW / 2, monY + 80);
         ctx.font = '10px "Microsoft YaHei", sans-serif';
         ctx.fillStyle = '#94a3b8';
         ctx.fillText('AI编译你的测试世界', monX + monW / 2, monY + 100);

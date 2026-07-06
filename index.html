@@ -3,10 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BugBoomer — AI 编译你的测试部世界</title>
+  <title>BugBomber — AI 编译你的测试工程世界</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/ui.css">
   <link rel="stylesheet" href="css/crt.css">
+  <script>
+  // 临时错误捕获器 — 诊断页面空白问题
+  window.addEventListener('error', function(e) {
+    var d = document.createElement('div');
+    d.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#1a0000;color:#ef4444;padding:16px;font-family:monospace;font-size:14px;white-space:pre-wrap;border-bottom:2px solid #ef4444';
+    d.textContent = 'JS错误: ' + (e.message || '未知') + '\n文件: ' + (e.filename || '') + ':' + (e.lineno || '') + '\n\n请截图发给我';
+    document.body && document.body.appendChild(d);
+  });
+  </script>
 </head>
 <body>
   <div id="app">
@@ -22,59 +31,80 @@
     <!-- 开局输入界面 -->
     <div id="input-screen" class="screen">
       <div class="title-block">
-        <h1 class="game-title">BugBoomer</h1>
+        <h1 class="game-title">BugBomber</h1>
         <p class="game-subtitle">AI 编译你的测试部世界</p>
       </div>
-      <div class="input-block">
-        <p class="input-hint">用一句话描述你的项目状态，AI 将编译出世界规则</p>
-        <div class="example-tags">
-          <span class="tag" onclick="quickInput('项目太乱')">项目太乱</span>
-          <span class="tag" onclick="quickInput('敏捷开发')">敏捷开发</span>
-          <span class="tag" onclick="quickInput('996')">996</span>
-          <span class="tag" onclick="quickInput('屎山重构')">屎山重构</span>
-          <span class="tag" onclick="quickInput('需求天天变')">需求天天变</span>
-        </div>
-        <div class="input-row">
-          <input type="text" id="world-input" placeholder="输入一句话..." maxlength="50">
-          <button id="compile-btn" onclick="compileWorld()">编译世界</button>
-        </div>
-        <p id="compile-status" class="status-text"></p>
-        <div id="post-compile-actions" class="post-compile-actions" style="display:none;">
-          <button id="recompile-btn" class="btn-secondary" onclick="recompileWorld()">🔄 重新编译</button>
-          <button id="start-btn" onclick="beginBattle()">▶ 开始战斗</button>
-        </div>
-        <p id="compile-extra-tip" class="compile-extra-tip"></p>
-        <div class="api-config">
-          <div class="api-config-header" onclick="toggleApiConfig()">
-            <span id="api-config-toggle">▸</span>
-            <span id="api-status-label">AI 接口：未配置（使用离线规则）</span>
+
+      <!-- 主输入卡片 -->
+      <div class="input-card" id="input-card">
+        <!-- 未编译：核心输入区 -->
+        <div id="input-pure-zone">
+          <p class="input-guide">用一句话描述你的项目状态，AI 将编译出世界规则</p>
+          <div class="example-tags">
+            <span class="tag" onclick="quickInput('项目太乱')">项目太乱</span>
+            <span class="tag" onclick="quickInput('敏捷开发')">敏捷开发</span>
+            <span class="tag" onclick="quickInput('996')">996</span>
+            <span class="tag" onclick="quickInput('屎山重构')">屎山重构</span>
+            <span class="tag" onclick="quickInput('需求天天变')">需求天天变</span>
           </div>
-          <div id="api-config-body" class="api-config-body" style="display:none;">
-            <div class="api-field">
-              <label>API 地址</label>
-              <input type="text" id="api-url" placeholder="https://api.deepseek.com/v1/chat/completions">
-            </div>
-            <div class="api-field">
-              <label>API Key</label>
-              <input type="password" id="api-key" placeholder="sk-...">
-            </div>
-            <div class="api-field">
-              <label>模型</label>
-              <input type="text" id="api-model" placeholder="deepseek-chat">
-            </div>
-            <div class="api-actions">
-              <button id="api-save-btn" onclick="saveApiConfig()">保存配置</button>
-              <button id="api-clear-btn" onclick="clearApiConfig()">清除</button>
-            </div>
-            <p class="api-tip">支持 OpenAI / DeepSeek 等兼容接口。配置后输入任意一句话即可由 AI 实时生成世界规则。</p>
+          <div class="input-row">
+            <input type="text" id="world-input" placeholder="开工" maxlength="50">
+            <button id="compile-btn" onclick="compileWorld()">编译世界</button>
           </div>
         </div>
-        <div class="input-footer">
-          <span class="tip">操作：WASD 移动 | 空格放炸弹 | 炸💩屎山 + 杀🟢Bug = 通关</span><br>
-          <span class="tip">产品改需求复活屎山 | 研发持续写Bug | 🍗鸡腿补血 🧋奶茶护盾 ⚡加速器</span><br>
-          <span class="tip">👻幽灵Bug穿墙 | 💥死机Bug倒计时爆炸 | 🔥P0要炸两次</span><br>
-          <span class="tip" style="color:#a78bfa">✨ 试试组合输入如"996项目太乱"触发隐藏规则...</span>
+
+        <!-- 编译完成后：输入区灰化 + 重编译按钮 -->
+        <div id="input-dimmed-zone" class="input-dimmed" style="display:none;">
+          <div class="input-row">
+            <input type="text" id="world-input-dimmed" placeholder="开工" maxlength="50" disabled>
+            <button id="recompile-inline-btn" class="btn-secondary" onclick="recompileWorld()">重新编译</button>
+          </div>
         </div>
+
+        <!-- 编译结果区：状态提示 + 规则预览 + 开始战斗 -->
+        <div id="compile-result-zone" style="display:none;">
+          <div class="compile-success">
+            <span class="compile-success-icon">✅</span>
+            <span id="compile-status-text">世界编译完成</span>
+          </div>
+          <div id="compile-rule-preview" class="compile-rule-preview"></div>
+          <div class="compile-result-actions">
+            <button id="recompile-btn" class="btn-secondary" onclick="recompileWorld()">重新编译</button>
+            <button id="start-btn" class="btn-primary" onclick="beginBattle()">开始战斗</button>
+          </div>
+          <p id="compile-extra-tip" class="compile-extra-tip"></p>
+        </div>
+
+        <!-- API 状态栏 -->
+        <div class="api-status-bar" id="api-status-bar" onclick="toggleApiConfig()">
+          <span id="api-status-label">AI 接口：未配置（当前使用离线规则包）</span>
+          <span id="api-config-toggle" class="api-toggle-arrow">▸</span>
+        </div>
+        <div id="api-config-body" class="api-config-body" style="display:none;">
+          <div class="api-field">
+            <label>API 地址</label>
+            <input type="text" id="api-url" placeholder="https://api.deepseek.com/v1/chat/completions">
+          </div>
+          <div class="api-field">
+            <label>API Key</label>
+            <input type="password" id="api-key" placeholder="sk-...">
+          </div>
+          <div class="api-field">
+            <label>模型</label>
+            <input type="text" id="api-model" placeholder="deepseek-chat">
+          </div>
+          <div class="api-actions">
+            <button id="api-save-btn" onclick="saveApiConfig()">保存配置</button>
+            <button id="api-clear-btn" onclick="clearApiConfig()">清除</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部说明 -->
+      <div class="input-footer-compact">
+        <p>操作：WASD 移动 ｜ 空格放炸弹 ｜ 清屎山 + 灭 Bug = 通关</p>
+        <p>🍗 补血  🧋 护盾  ⚡ 加速  👻 穿墙Bug  💀 死机Bug  🔥 P0要炸两次</p>
+        <p class="footer-easter-egg">组合输入可触发隐藏规则</p>
       </div>
     </div>
 
@@ -95,31 +125,95 @@
       <div class="game-wrapper">
         <div class="game-left">
           <div class="hud">
-            <div class="hud-item">
+            <div class="hud-item" id="hud-lives">
               <span class="hud-icon">❤️</span>
               <span id="lives">3</span>
             </div>
-            <div class="hud-item">
-              <span class="hud-icon">🟢</span>
+            <div class="hud-item" id="hud-bugs">
+              <span class="hud-icon">🐛</span>
               <span id="bug-count">0</span>
             </div>
-            <div class="hud-item">
+            <div class="hud-item" id="hud-combo" style="display:none;">
+              <span class="hud-icon">🔥</span>
+              <span id="combo-hud">x0</span>
+            </div>
+            <div class="hud-item hud-secondary" id="hud-clear">
               <span class="hud-icon">💩</span>
               <span id="clear-rate">0%</span>
+            </div>
+            <div class="hud-item hud-secondary" id="hud-stability">
+              <span class="hud-icon">📊</span>
+              <span id="stability-hud">稳定度 50%</span>
             </div>
             <div class="hud-item" id="speed-hud" style="display:none;">
               <span class="hud-icon">⚡</span>
               <span id="speed-timer">10</span>
             </div>
           </div>
+          <div class="xp-bar-wrap" id="xp-bar">
+            <div class="xp-bar-fill" id="xp-fill" style="width:0%;"></div>
+            <div class="xp-bar-label" id="xp-label">Lv.1 (0/24)</div>
+          </div>
           <div class="canvas-container">
             <canvas id="game-canvas" width="1092" height="1092" style="width:546px;height:546px;"></canvas>
             <div class="crt-overlay"></div>
             <div class="danger-vignette"></div>
+            <div class="help-badge" title="按 ? 查看操作说明">?</div>
+            <!-- 产品经理 — 左侧 -->
+            <div class="char-pm" id="char-pm">
+              <div class="char-speech" id="pm-speech"></div>
+              <div class="char-figure">
+                <div class="char-head">🧑‍💼</div>
+                <div class="char-body-pm"></div>
+                <div class="char-arm-pm" id="pm-arm"></div>
+              </div>
+              <div class="char-desk"></div>
+              <div class="char-label">产品</div>
+            </div>
+            <!-- 研发工程师 — 右侧 -->
+            <div class="char-dev" id="char-dev">
+              <div class="char-speech" id="dev-speech"></div>
+              <div class="char-figure">
+                <div class="char-head">🧑‍💻</div>
+                <div class="char-body-dev"></div>
+                <div class="char-arm-dev" id="dev-arm"></div>
+              </div>
+              <div class="char-desk"></div>
+              <div class="char-label">研发</div>
+            </div>
           </div>
           <div id="banner-area"></div>
           <div id="battle-hint" class="battle-hint"></div>
           <div id="roast-bubble" class="roast-bubble"></div>
+          <!-- ? 键帮助浮层 -->
+          <div id="help-overlay" class="help-overlay" style="display:none;">
+            <div class="help-card">
+              <div class="help-header">🎮 操作说明 <span class="help-close">按 ? 关闭</span></div>
+              <div class="help-body">
+                <div class="help-section">
+                  <div class="help-label">基础操作</div>
+                  <div class="help-row"><kbd>W A S D</kbd> <span>移动</span></div>
+                  <div class="help-row"><kbd>空格</kbd> <span>放置炸弹</span></div>
+                </div>
+                <div class="help-section">
+                  <div class="help-label">目标</div>
+                  <div class="help-row">💣 炸屎山 + 🐛 灭 Bug = 通关</div>
+                </div>
+                <div class="help-section">
+                  <div class="help-label">道具</div>
+                  <div class="help-row">🍗 补血  🧋 护盾  ⚡ 加速</div>
+                </div>
+                <div class="help-section">
+                  <div class="help-label">特殊 Bug</div>
+                  <div class="help-row">👻 幽灵穿墙  💀 死机倒计时  🔥 P0 要炸两次</div>
+                </div>
+                <div class="help-section">
+                  <div class="help-label">三方世界</div>
+                  <div class="help-row">产品改需求复活屎山 ｜ 研发持续写 Bug ｜ 屎山自愈</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="game-right">
           <div id="rule-panel" class="rule-panel">
@@ -153,6 +247,7 @@
   <script src="js/systems/developer.js"></script>
   <script src="js/systems/shishan.js"></script>
   <script src="js/systems/rules.js"></script>
+  <script src="js/systems/characters.js"></script>
   <script src="js/ai/fallback.js"></script>
   <script src="js/ai/prompt.js"></script>
   <script src="js/ai/compiler.js"></script>

@@ -51,11 +51,12 @@ const Effects = {
     }
   },
 
-  flashBorder() {
+  flashBorder(type) {
     const container = document.querySelector('.canvas-container');
     if (container) {
-      container.classList.add('flash-border');
-      setTimeout(() => container.classList.remove('flash-border'), 1000);
+      const cls = 'flash-border' + (type ? '-' + type : '');
+      container.classList.add(cls);
+      setTimeout(() => container.classList.remove(cls), 1000);
     }
   },
 
@@ -357,6 +358,16 @@ const Effects = {
       flash.style.cssText = 'position:absolute;inset:0;background:rgba(220,38,38,0.4);pointer-events:none;z-index:100;animation:boss-flash 1.5s ease-out forwards;';
       container.appendChild(flash);
       setTimeout(() => flash.remove(), 1500);
+
+      // Boss 警告横幅
+      const warnOverlay = document.createElement('div');
+      warnOverlay.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:101;pointer-events:none;text-align:center;animation:boss-warn 1.5s ease-out forwards;';
+      warnOverlay.innerHTML = `
+        <div style="font-size:48px;font-weight:900;color:#DC2626;text-shadow:0 0 20px rgba(220,38,38,0.8),0 0 40px rgba(220,38,38,0.5);letter-spacing:4px;">BOSS</div>
+        <div style="font-size:18px;color:#fbbf24;margin-top:8px;text-shadow:0 0 10px rgba(251,191,36,0.6);">Bug 降临中...</div>
+      `;
+      container.appendChild(warnOverlay);
+      setTimeout(() => warnOverlay.remove(), 1500);
     }
 
     // 全屏粒子风暴 — 红色 + 黑色
@@ -372,16 +383,6 @@ const Effects = {
         color: ['#DC2626', '#991B1B', '#1a0000', '#ef4444', '#7F1D1D'][Math.floor(Math.random() * 5)],
       });
     }
-
-    // Boss 警告横幅
-    const warnOverlay = document.createElement('div');
-    warnOverlay.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:101;pointer-events:none;text-align:center;animation:boss-warn 1.5s ease-out forwards;';
-    warnOverlay.innerHTML = `
-      <div style="font-size:48px;font-weight:900;color:#DC2626;text-shadow:0 0 20px rgba(220,38,38,0.8),0 0 40px rgba(220,38,38,0.5);letter-spacing:4px;">BOSS</div>
-      <div style="font-size:18px;color:#fbbf24;margin-top:8px;text-shadow:0 0 10px rgba(251,191,36,0.6);">Bug 降临中...</div>
-    `;
-    container.appendChild(warnOverlay);
-    setTimeout(() => warnOverlay.remove(), 1500);
   },
 
   // ====== "一大波Bug正在奔来" — PvZ 风格预警横幅 ======
@@ -414,15 +415,21 @@ const Effects = {
     this.bigShake();
     Sound.play('bugWave');
 
-    // 延迟生成一波 Bug（4~6个），横幅显示后0.8秒开始
-    const waveCount = 4 + Math.floor(Math.random() * 3);
+    // 计算剩余可用的 Bug 槽位
+    const remainingSlots = Enemy.maxAlive - Enemy.count();
+    if (remainingSlots <= 0) {
+      return;
+    }
+    
+    // 延迟生成一波 Bug（最多剩余槽位或3个，取较小值），横幅显示后0.8秒开始
+    const waveCount = Math.min(2 + Math.floor(Math.random() * 3), remainingSlots);
     const bugTypes = ['normal', 'normal', 'normal', 'ghost', 'crash'];
 
     setTimeout(() => {
       for (let i = 0; i < waveCount; i++) {
         setTimeout(() => {
           if (Game.state !== 'playing') return;
-          if (Enemy.count() >= 15) return;
+          if (Enemy.count() >= Enemy.maxAlive) return;
           const type = bugTypes[Math.floor(Math.random() * bugTypes.length)];
           Enemy.spawn(type);
           // 每个Bug出生时来个传送门特效

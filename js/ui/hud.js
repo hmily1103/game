@@ -38,7 +38,32 @@ const HUD = {
 
     if (clearRate) {
       const rate = Math.floor(GameMap.getClearRate() * 100);
-      clearRate.textContent = rate + '%';
+      // 清除进度 — 直接对应通关条件「清除率≥70%」
+      clearRate.textContent = '清除 ' + rate + '%';
+      if (rate >= 70) {
+        clearRate.style.color = '#10B981';
+      } else if (rate >= 40) {
+        clearRate.style.color = '#fbbf24';
+      } else {
+        clearRate.style.color = '#94a3b8';
+      }
+    }
+
+    // 系统稳定度 — 达标≥95%即可通关
+    const stabilityEl = document.getElementById('stability-hud');
+    if (stabilityEl) {
+      const stability = typeof getSystemStability === 'function' ? getSystemStability() : 50;
+      stabilityEl.textContent = '稳定度 ' + stability + '%';
+      if (stability >= 95) {
+        stabilityEl.style.color = '#10B981';
+        stabilityEl.style.fontWeight = 'bold';
+      } else if (stability >= 70) {
+        stabilityEl.style.color = '#fbbf24';
+        stabilityEl.style.fontWeight = 'normal';
+      } else {
+        stabilityEl.style.color = '#ef4444';
+        stabilityEl.style.fontWeight = 'normal';
+      }
     }
 
     // 加速指示器
@@ -61,6 +86,37 @@ const HUD = {
       } else {
         speedHud.style.display = 'none';
         speedHud.classList.remove('heart-critical');
+      }
+    }
+
+    // XP 进度条
+    const xpBar = document.getElementById('xp-bar');
+    const xpFill = document.getElementById('xp-fill');
+    const xpLabel = document.getElementById('xp-label');
+    if (xpBar && xpFill && xpLabel) {
+      const xpNeeded = Game.level * Game.xpPerLevel;
+      const pct = Math.min(100, Math.floor(Game.xp / xpNeeded * 100));
+      xpFill.style.width = pct + '%';
+      xpLabel.textContent = 'Lv.' + Game.level + ' (' + Game.xp + '/' + xpNeeded + ')';
+    }
+
+    // 连击显示
+    const comboEl = document.getElementById('combo-hud');
+    if (comboEl) {
+      if (Game.combo >= 3) {
+        comboEl.style.display = '';
+        comboEl.textContent = '🔥 x' + Game.combo;
+        comboEl.style.color = Game.combo >= 5 ? '#f59e0b' : '#22d3ee';
+        comboEl.style.fontWeight = 'bold';
+        comboEl.style.animation = Game.combo >= 5 ? 'combo-pulse 0.5s ease infinite' : 'none';
+      } else if (Game.combo >= 2) {
+        comboEl.style.display = '';
+        comboEl.textContent = 'x' + Game.combo;
+        comboEl.style.color = '#a78bfa';
+        comboEl.style.fontWeight = 'normal';
+        comboEl.style.animation = 'none';
+      } else {
+        comboEl.style.display = 'none';
       }
     }
   },

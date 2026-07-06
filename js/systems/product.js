@@ -7,12 +7,13 @@ const ProductSystem = {
 
   init() {
     this.interval = RuleEngine.config.productInterval;
-    // 第一次触发提前到 1/3 时间，让前30秒有节奏感
-    this.timer = Math.min(this.interval * 20, this.interval * 60);
+    // 第一次触发为完整间隔，给玩家适应时间
+    this.timer = this.interval * 60;
     this.active = true;
   },
 
   update() {
+    if (Game.state !== 'playing') return;
     if (!this.active) return;
 
     this.timer--;
@@ -39,7 +40,7 @@ const ProductSystem = {
 
     // 随机搞笑横幅
     Effects.randomProductBanner();
-    Effects.flashBorder();
+    Effects.flashBorder('product');
     Danmaku.show('product');
     if (actualRespawn > 0) {
       Danmaku.show('shishan');
@@ -56,5 +57,15 @@ const ProductSystem = {
       '产品：明天能上线吗？',
     ];
     Effects.banner('💼 ' + productQuotes[Math.floor(Math.random() * productQuotes.length)]);
+
+    // 角色动画 — PM 举手 + 气泡
+    const productLines = [
+      '新需求提了！', '就改一行代码', '这个很简单啦~',
+      '用户想要个功能', '加个按钮就行', '紧急需求！',
+    ];
+    Characters.productAction(productLines[Math.floor(Math.random() * productLines.length)]);
+
+    // 下次触发加随机抖动 — 更像"系统失控"而非定时器
+    this.timer = (this.interval + (Math.random() - 0.5) * 4) * 60;
   },
 };

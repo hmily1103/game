@@ -76,10 +76,7 @@ const Compiler = {
     } catch (err) {
       console.warn('[Compiler] AI 调用失败，降级到离线兜底:', err.message);
       const fallback = FallbackRules.match(input);
-      // 保留 fallback 原始 source（如"隐藏规则 ✨"），仅在无 source 时才标记降级
-      if (!fallback.source) {
-        fallback.source = '本地兜底（AI 降级）';
-      }
+      fallback.source = '本地兜底（AI 降级）';
       fallback.rawJson = '';
       return fallback;
     }

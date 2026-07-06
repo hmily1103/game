@@ -15,12 +15,14 @@ const ShishanSystem = {
   },
 
   update() {
+    if (Game.state !== 'playing') return;
     if (this.regenInterval <= 0) return;
 
     this.regenTimer--;
     if (this.regenTimer <= 0) {
       this.regen();
-      this.regenTimer = this.regenInterval * 60;
+      // 下次触发加随机抖动
+      this.regenTimer = (this.regenInterval + (Math.random() - 0.5) * 4) * 60;
     }
   },
 
