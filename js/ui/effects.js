@@ -2,7 +2,7 @@
 
 const Effects = {
   particles: [],
-  MAX_PARTICLES: 200,  // 粒子上限，防止大波次卡顿
+  MAX_PARTICLES: GameConfig.particles.maxParticles, // 使用统一配置，默认120
   // 鸡腿雨特效队列
   drumsticks: [],
   // 屎山飞射碎片队列 — 加速时炸屎山，碎片飞出屏幕
@@ -535,6 +535,7 @@ const Effects = {
       this.particles.splice(0, this.particles.length - this.MAX_PARTICLES);
     }
 
+    // 批量更新粒子
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.x += p.vx;
@@ -546,7 +547,10 @@ const Effects = {
       }
     }
 
-    // 鸡腿雨更新
+    // 鸡腿雨更新（带上限
+    if (this.drumsticks.length > GameConfig.particles.maxDrumsticks) {
+      this.drumsticks.splice(0, this.drumsticks.length - GameConfig.particles.maxDrumsticks);
+    }
     for (let i = this.drumsticks.length - 1; i >= 0; i--) {
       const d = this.drumsticks[i];
       d.x += d.vx;
@@ -559,7 +563,10 @@ const Effects = {
       }
     }
 
-    // 屎山飞射碎片更新 — 高速飞出屏幕
+    // 屎山飞射碎片更新（带上限
+    if (this.flyingPoops.length > GameConfig.particles.maxFlyingPoops) {
+      this.flyingPoops.splice(0, this.flyingPoops.length - GameConfig.particles.maxFlyingPoops);
+    }
     for (let i = this.flyingPoops.length - 1; i >= 0; i--) {
       const fp = this.flyingPoops[i];
       fp.x += fp.vx;

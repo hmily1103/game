@@ -5,7 +5,9 @@ const Enemy = {
   list: [],
   nextId: 0,
   spawnCount: 0,
-  maxAlive: 12, // 最大同时存活的 Bug 数量，防止卡顿
+  maxAlive: GameConfig.bugs.maxAlive, // 最大同时存活的 Bug 数，防止卡顿
+  difficultyLevel: 1, // 当前难度等级
+  difficultyTimer: 0, // 难度提升计时器
   // 各类型击杀统计
   killStats: { normal: 0, ghost: 0, crash: 0, p0: 0, boss: 0 },
 
@@ -55,11 +57,30 @@ const Enemy = {
     this.list = [];
     this.nextId = 0;
     this.spawnCount = 0;
+    this.difficultyLevel = 1;
+    this.difficultyTimer = 0;
     this.killStats = { normal: 0, ghost: 0, crash: 0, p0: 0, boss: 0 };
     // 初始生成 3 个普通 Bug
     for (let i = 0; i < 3; i++) {
       this.spawn('normal');
     }
+  },
+
+  // 动态难度提升
+  updateDifficulty(deltaTime) {
+    this.difficultyTimer += deltaTime;
+    if (this.difficultyTimer >= GameConfig.difficulty.rampInterval) {
+      this.difficultyTimer = 0;
+      if (this.difficultyLevel < GameConfig.difficulty.maxLevel) {
+        this.difficultyLevel++;
+        Effects.banner(`⚠️ 难度提升！等级 ${this.difficultyLevel}`);
+      }
+    }
+  },
+
+  // 获取当前难度下的速度倍数
+  getDifficultySpeedMultiplier() {
+    return 1 + (this.difficultyLevel - 1) * (GameConfig.difficulty.bugSpeedMultiplier - 1);
   },
 
   spawn(type, x, y) {
@@ -105,7 +126,7 @@ const Enemy = {
       targetY: pos.y * CELL_SIZE,
       moving: false,
       dir: Math.floor(Math.random() * 4),
-      speed: 1.5 * config.speed * RuleEngine.config.bugSpeed,
+      speed: 1.5 * config.speed * RuleEngine.config.bugSpeed * this.getDifficultySpeedMultiplier(),
       alive: true,
       health: config.health,
       // 幽灵虫

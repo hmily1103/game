@@ -685,6 +685,9 @@ function gameLoop(timestamp) {
 
   Player.update();
   Enemy.update();
+  // 更新动态难度
+  const deltaTime = 1000 / 60; // 每帧约16ms
+  Enemy.updateDifficulty(deltaTime);
   Bomb.update();
   Pickup.update();
   ProductSystem.update();
@@ -985,6 +988,15 @@ function showEndScreen(won) {
   const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
   const safeWorldName = esc(worldName);
 
+  // ========== 存档数据 ==========
+  // 计算得分
+  const score = bugsKilled * 10 + clearRate + (stability / 2) + (won ? 1000 : 0);
+  // 保存记录
+  const isNewBestScore = Storage.stats.setBestScore(Math.floor(score));
+  const isNewBestCombo = Storage.stats.setBestCombo(Game.maxCombo);
+  Storage.stats.incrementTotalGames();
+  Storage.stats.addKills(bugsKilled);
+
   if (won) {
     const victoryMsgs = [
       '所有测试用例通过，技术债已清零。你的奖励是：明天继续上班。',
@@ -1053,6 +1065,21 @@ function showEndScreen(won) {
       <div style="width:100%;margin-top:8px;padding:10px 14px;background:linear-gradient(135deg,#1a1a2e,#2a1a3e);border:1px solid #a78bfa;border-radius:8px;font-size:14px;color:#a78bfa;font-weight:600;text-align:center;">
         💬 ${roastText}
       </div>
+      ${(isNewBestScore || isNewBestCombo) ? `
+        <div style="width:100%;margin-top:8px;padding:10px 14px;background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid #f59e0b;border-radius:8px;">
+          <div style="color:#f59e0b;font-weight:700;text-align:center;">🏆 新纪录！</div>
+          <div style="color:#94a3b8;font-size:12px;text-align:center;margin-top:4px;">
+            ${isNewBestScore ? `最佳得分：${Math.floor(score)}` : ''}
+            ${isNewBestScore && isNewBestCombo ? ' • ' : ''}
+            ${isNewBestCombo ? `最高连击：${Game.maxCombo}` : ''}
+          </div>
+        </div>
+      ` : ''}
+      <div style="width:100%;margin-top:8px;padding:8px 12px;background:#1e293b;border-radius:6px;color:#64748b;font-size:11px;display:flex;justify-content:space-between;">
+        <span>历史最佳：${Storage.stats.getBestScore()}分</span>
+        <span>总场次：${Storage.stats.getTotalGames()}局</span>
+        <span>总击杀：${Storage.stats.getTotalKills()}只</span>
+      </div>
     `;
   } else {
     const deathMsg = deathCauses[Math.floor(Math.random() * deathCauses.length)];
@@ -1113,6 +1140,21 @@ function showEndScreen(won) {
       </div>
       <div style="width:100%;margin-top:8px;padding:10px 14px;background:linear-gradient(135deg,#1a1a2e,#2a1a1e);border:1px solid #f87171;border-radius:8px;font-size:14px;color:#f87171;font-weight:600;text-align:center;">
         💬 ${roastText}
+      </div>
+      ${isNewBestScore || isNewBestCombo ? `
+        <div style="width:100%;margin-top:8px;padding:10px 14px;background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid #f59e0b;border-radius:8px;">
+          <div style="color:#f59e0b;font-weight:700;text-align:center;">🏆 虽败犹荣！</div>
+          <div style="color:#94a3b8;font-size:12px;text-align:center;margin-top:4px;">
+            ${isNewBestScore ? `最佳得分：${Math.floor(score)}` : ''}
+            ${isNewBestScore && isNewBestCombo ? ' • ' : ''}
+            ${isNewBestCombo ? `最高连击：${Game.maxCombo}` : ''}
+          </div>
+        </div>
+      ` : ''}
+      <div style="width:100%;margin-top:8px;padding:8px 12px;background:#1e293b;border-radius:6px;color:#64748b;font-size:11px;display:flex;justify-content:space-between;">
+        <span>历史最佳：${Storage.stats.getBestScore()}分</span>
+        <span>总场次：${Storage.stats.getTotalGames()}局</span>
+        <span>总击杀：${Storage.stats.getTotalKills()}只</span>
       </div>
     `;
   }
