@@ -96,7 +96,7 @@
 @keyframes flash-border-dev {
   0%, 100% { border-color: #475569; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5); }
   25%, 75% { border-color: #22c55e; box-shadow: 0 0 30px rgba(34, 197, 94, 0.5), 0 8px 32px rgba(0, 0, 0, 0.5); }
-  50% { border-color: #4ade80; box-shadow: 0 0 40px rgba(74, 222, 128, 0.6), 0 8px 32px rgba(0, 0, 0, 0.5); }
+  50% { border-color: #10B981; box-shadow: 0 0 40px rgba(16, 185, 129, 0.6), 0 8px 32px rgba(0, 0, 0, 0.5); }
 }
 
 /* 旧版通用闪烁 — 保留兼容 */

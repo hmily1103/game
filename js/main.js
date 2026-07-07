@@ -52,6 +52,17 @@ const Game = {
   upgradeOptions: null, // 当前升级选项
   totalBombsPlaced: 0,
   totalShishanCleared: 0,
+  // 暂停状态
+  isPaused: false,
+  previousState: null,  // 暂停前的状态
+  // 定时器与运行态收口
+  compileAnimationTimers: [],
+  compileRunId: 0,
+  pendingBossSpawnTimer: null,
+  judgeBugSpeedMultiplier: 1,
+  timeLimitFrames: 0,
+  endlessMode: false,
+  endlessStartTime: 0,
 };
 
 // 搞笑死因列表
@@ -116,10 +127,147 @@ function getDeathRoast(stats) {
   return roasts[Math.floor(Math.random() * roasts.length)];
 }
 
+function getRemainingTimeSeconds() {
+  return Math.max(0, Math.ceil((Game.timeLimitFrames || 0) / 60));
+}
+
+function clearDirectionalInput() {
+  Input.left = false;
+  Input.right = false;
+  Input.up = false;
+  Input.down = false;
+}
+
+function setDirectionalInput(direction, active) {
+  if (Game.state !== 'playing') {
+    clearDirectionalInput();
+    return;
+  }
+
+  if (active) {
+    clearDirectionalInput();
+    if (direction in Input) Input[direction] = true;
+    return;
+  }
+
+  if (direction in Input) Input[direction] = false;
+}
+
+function setupTouchControls() {
+  const controls = document.getElementById('mobile-controls');
+  if (!controls) return;
+
+  const bindPressState = (element, onPress, onRelease) => {
+    if (!element) return;
+    const press = (e) => {
+      e.preventDefault();
+      element.classList.add('is-active');
+      onPress();
+    };
+    const release = (e) => {
+      e.preventDefault();
+      element.classList.remove('is-active');
+      onRelease();
+    };
+
+    element.addEventListener('pointerdown', press);
+    element.addEventListener('pointerup', release);
+    element.addEventListener('pointercancel', release);
+    element.addEventListener('pointerleave', release);
+  };
+
+  controls.querySelectorAll('[data-touch-dir]').forEach((button) => {
+    const direction = button.getAttribute('data-touch-dir');
+    bindPressState(
+      button,
+      () => setDirectionalInput(direction, true),
+      () => setDirectionalInput(direction, false)
+    );
+  });
+
+  bindPressState(
+    document.getElementById('touch-bomb-btn'),
+    () => {
+      if (Game.state === 'playing') Player.placeBomb();
+    },
+    () => {}
+  );
+}
+
 // ========== 输入处理 ==========
+
+// ========== 暂停系统 ==========
+function togglePause() {
+  // 只在 playing 或 paused 状态下切换
+  if (Game.state !== 'playing' && Game.state !== 'paused') return;
+
+  if (Game.isPaused) {
+    // 恢复游戏
+    Game.isPaused = false;
+    Game.state = Game.previousState || 'playing';
+    Game.previousState = null;
+    const overlay = document.getElementById('pause-overlay');
+    if (overlay) overlay.remove();
+    Effects.unpauseBanner();
+    Sound.startBgm();
+    Game.lastTime = performance.now();
+    requestAnimationFrame(gameLoop);
+  } else {
+    // 暂停游戏
+    Game.isPaused = true;
+    Game.previousState = Game.state;
+    Game.state = 'paused';
+    clearDirectionalInput();
+    Sound.stopBgm();
+    renderPauseOverlay();
+  }
+}
+
+function renderPauseOverlay() {
+  const overlay = document.createElement('div');
+  overlay.id = 'pause-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    font-family: 'Courier New', monospace;
+  `;
+  overlay.innerHTML = `
+    <div style="font-size: 48px; font-weight: 900; color: #f59e0b; margin-bottom: 16px; text-shadow: 0 0 20px rgba(245, 158, 11, 0.6);">⏸️ 暂停</div>
+    <div style="font-size: 14px; color: #94a3b8; margin-bottom: 32px;">按 ESC 继续，或点击下方按钮</div>
+    <button id="resume-btn" style="
+      padding: 12px 48px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #1e293b;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      transition: transform 0.2s;
+    ">继续游戏</button>
+    <div style="margin-top: 16px; font-size: 12px; color: #64748b;">ESC = 继续</div>
+  `;
+  document.body.appendChild(overlay);
+
+  document.getElementById('resume-btn').addEventListener('click', togglePause);
+}
 
 function setupInput() {
   document.addEventListener('keydown', (e) => {
+    // ESC 暂停/继续
+    if (e.key === 'Escape') {
+      togglePause();
+      e.preventDefault();
+      return;
+    }
+
     if (Game.state !== 'playing') return;
     switch (e.key) {
       case 'ArrowLeft':
@@ -228,6 +376,70 @@ function toggleHelpOverlay() {
   } else {
     overlay.style.display = 'none';
   }
+}
+
+function clearCompileAnimationTimers() {
+  for (const timerId of Game.compileAnimationTimers) {
+    clearTimeout(timerId);
+  }
+  Game.compileAnimationTimers = [];
+}
+
+function scheduleCompileAnimation(runId, callback, delay) {
+  const timerId = setTimeout(async () => {
+    Game.compileAnimationTimers = Game.compileAnimationTimers.filter(id => id !== timerId);
+    if (Game.compileRunId !== runId) return;
+    await callback();
+  }, delay);
+  Game.compileAnimationTimers.push(timerId);
+  return timerId;
+}
+
+function clearBossSpawnTimer() {
+  if (Game.pendingBossSpawnTimer !== null) {
+    clearTimeout(Game.pendingBossSpawnTimer);
+    Game.pendingBossSpawnTimer = null;
+  }
+}
+
+function updateSoundToggleUI() {
+  const btn = document.getElementById('sound-toggle-btn');
+  if (!btn) return;
+  btn.textContent = Sound.enabled ? '🔊 音频：开' : '🔇 音频：关';
+}
+
+function applySavedSettings() {
+  const settings = Storage.settings.get();
+  Sound.setEnabled(settings.soundEnabled !== false);
+  updateSoundToggleUI();
+}
+
+function toggleSoundSetting() {
+  const nextEnabled = !Sound.enabled;
+  Sound.setEnabled(nextEnabled);
+  Storage.settings.update('soundEnabled', nextEnabled);
+  updateSoundToggleUI();
+}
+
+function renderPromptPreview(input) {
+  const box = document.getElementById('prompt-preview-box');
+  const content = document.getElementById('prompt-preview-content');
+  const toggleBtn = document.getElementById('prompt-toggle-btn');
+  if (!box || !content || !toggleBtn) return;
+
+  content.textContent = PromptTemplate.build(input);
+  box.style.display = 'none';
+  toggleBtn.textContent = '查看 Prompt';
+}
+
+function togglePromptPreview() {
+  const box = document.getElementById('prompt-preview-box');
+  const toggleBtn = document.getElementById('prompt-toggle-btn');
+  if (!box || !toggleBtn) return;
+
+  const shouldShow = box.style.display === 'none' || !box.style.display;
+  box.style.display = shouldShow ? 'block' : 'none';
+  toggleBtn.textContent = shouldShow ? '隐藏 Prompt' : '查看 Prompt';
 }
 
 // ========== 快捷输入 ==========
@@ -420,6 +632,7 @@ function applyCompiledWorld(input, ruleData) {
   // 切换到编译完成状态：灰化输入区 + 展开结果
   showInputDimmedZone(true);
   showCompileResultZone(true);
+  renderPromptPreview(input);
   renderCompileResult(ruleData);
 
   // 同步规则到引擎和右侧面板
@@ -492,6 +705,9 @@ function showCompileAnimation(input, callback, options = {}) {
   const speedMultiplier = options.fastMode ? 0.35 : 1;
   const finalWait = Math.round(1800 * speedMultiplier);
   const closeDelay = options.fastMode ? 300 : 800;
+  const runId = ++Game.compileRunId;
+
+  clearCompileAnimationTimers();
 
   overlay.style.display = 'flex';
   linesDiv.innerHTML = '';
@@ -510,7 +726,7 @@ function showCompileAnimation(input, callback, options = {}) {
 
   // 逐行显示
   steps.forEach((step, i) => {
-    setTimeout(() => {
+    scheduleCompileAnimation(runId, () => {
       const line = document.createElement('div');
       line.className = 'compile-line active';
       line.textContent = step.text;
@@ -539,11 +755,11 @@ function showCompileAnimation(input, callback, options = {}) {
   const aiPromise = Compiler.compile(input);
 
   // 步骤展示完后等 AI 结果
-  setTimeout(async () => {
+  scheduleCompileAnimation(runId, async () => {
     const ruleData = await aiPromise;
+    if (Game.compileRunId !== runId) return;
 
     // 最后一步：世界编译完成
-    const lastStep = steps[steps.length - 1];
     const lastLine = linesDiv.children[steps.length - 1];
     if (lastLine) {
       lastLine.classList.remove('active');
@@ -565,7 +781,7 @@ function showCompileAnimation(input, callback, options = {}) {
     }
 
     // 0.8秒后关闭动画，进入游戏
-    setTimeout(() => {
+    scheduleCompileAnimation(runId, () => {
       overlay.style.display = 'none';
       callback(ruleData);
     }, closeDelay);
@@ -585,9 +801,30 @@ function showBattleHint(text) {
 // ========== 开始游戏 ==========
 
 function startGame() {
+  clearCompileAnimationTimers();
+  clearBossSpawnTimer();
+  Effects.clearTransientTimers();
+
   document.getElementById('input-screen').classList.remove('active');
   document.getElementById('game-screen').classList.add('active');
   document.getElementById('end-screen').classList.remove('active');
+
+  // 每局恢复基础节奏，再按试玩模式做局部修正
+  Game.judgeBugSpeedMultiplier = 1;
+  Game.ghostInterval = 1800;
+  Game.crashInterval = 2400;
+  Game.p0Interval = 3600;
+  Game.bossInterval = 3600;
+
+  // 评委试玩模式 — 首局降低难度
+  const isFirstGame = !localStorage.getItem('bugboomer_played');
+  if (isFirstGame) {
+    Game.judgeBugSpeedMultiplier = 0.8;
+    Game.ghostInterval = 2400;  // 40秒（原30秒）
+    Game.crashInterval = 3000;  // 50秒（原40秒）
+    Game.p0Interval = 4800;     // 80秒（原60秒）
+    Game.bossInterval = 4800;   // 80秒（首局降低难度）
+  }
 
   GameMap.init();
   Player.init();
@@ -597,15 +834,8 @@ function startGame() {
   RuleEngine.refreshSystems();
   Characters.init();
 
-  // 评委试玩模式 — 首局降低难度
-  const isFirstGame = !localStorage.getItem('bugboomer_played');
   if (isFirstGame) {
-    // 首局：Bug速度降低20%、特殊Bug间隔加长、道具掉落率提升
-    RuleEngine.config.bugSpeed *= 0.8;
-    Game.ghostInterval = 2400;  // 40秒（原30秒）
-    Game.crashInterval = 3000;  // 50秒（原40秒）
-    Game.p0Interval = 4800;     // 80秒（原60秒）
-    Game.bossInterval = 4800;   // 80秒（首局降低难度）
+    // 首局：仅通过试玩倍率降低 Bug 速度，不改写规则本身
     Pickup.dropChance = 0.28;   // 28%（原18%）
     localStorage.setItem('bugboomer_played', '1');
     console.log('[评委试玩模式] 首局难度已降低');
@@ -614,13 +844,17 @@ function startGame() {
   if (RuleEngine.config.oneLife) {
     Player.lives = 1;
   }
-  // 默认2个炸弹（doubleBomb规则可进一步确认）
-  Player.maxBombs = RuleEngine.config.doubleBomb ? 2 : 2;
+  // 默认1个炸弹，命中双炸弹规则才提升到2
+  Player.maxBombs = RuleEngine.config.doubleBomb ? 2 : 1;
+  Game.timeLimitFrames = RuleEngine.config.timePressure > 0
+    ? Math.round(RuleEngine.config.timePressure * 60)
+    : 0;
   Player.setSpeed(RuleEngine.config.playerSpeed);
 
   if (!Sound.ctx) {
     Sound.init();
   }
+  applySavedSettings();
 
   Renderer.init();
 
@@ -637,6 +871,11 @@ function startGame() {
   Game.upgradeOptions = null;
   Game.totalBombsPlaced = 0;
   Game.totalShishanCleared = 0;
+  Game.endlessMode = false;
+  Game.endlessStartTime = 0;
+  Game.timeLimitFrames = RuleEngine.config.timePressure > 0
+    ? Math.round(RuleEngine.config.timePressure * 60)
+    : 0;
   Game.startTime = performance.now();
   Game.ghostSpawnTimer = 0;
   Game.crashSpawnTimer = 0;
@@ -662,6 +901,7 @@ function startGame() {
 
   Game.state = 'playing';
   Game.lastTime = performance.now();
+  Sound.startBgm();
 
   // 开局规则警告 — 检测到危险规则时全屏提示
   Effects.showRuleWarning();
@@ -683,6 +923,16 @@ function gameLoop(timestamp) {
 
   Game.frameCount++;
 
+  if (Game.timeLimitFrames > 0) {
+    Game.timeLimitFrames--;
+    if (Game.timeLimitFrames <= 0) {
+      Game.timeLimitFrames = 0;
+      Game.state = 'lost';
+      showEndScreen(false);
+      return;
+    }
+  }
+
   Player.update();
   Enemy.update();
   // 更新动态难度
@@ -700,7 +950,8 @@ function gameLoop(timestamp) {
   // Bug 浪潮 — 每 45 秒触发一次"一大波Bug正在奔来"
   // Bug 浪潮冷却 — 升级后 10 秒内不触发
   Game.bugWaveTimer++;
-  if (Game.bugWaveTimer >= Game.bugWaveInterval && Enemy.count() < 10 && Game.levelUpCooldown <= 0) {
+  const difficultySpawnMultiplier = Enemy.getDifficultySpawnMultiplier();
+  if (Game.bugWaveTimer >= Math.floor(Game.bugWaveInterval * difficultySpawnMultiplier) && Enemy.count() < 10 && Game.levelUpCooldown <= 0) {
     Game.bugWaveTimer = 0;
     Effects.bugWave();
   }
@@ -896,8 +1147,19 @@ function checkWinCondition() {
   const clearRate = GameMap.getClearRate();
   const stability = getSystemStability();
 
-  // 胜利条件：稳定度≥95%，或传统条件（无Bug且清理率≥70%）
-  if (stability >= 95 || (bugCount === 0 && clearRate >= 0.7)) {
+  // 达成发布目标后转入无尽模式，直到阵亡再结算
+  if (!Game.endlessMode && (stability >= 95 || (bugCount === 0 && clearRate >= GameConfig.victory.clearRateRequirement))) {
+    Game.endlessMode = true;
+    Game.endlessStartTime = performance.now();
+    Game.timeLimitFrames = 0;
+    Effects.banner('♾️ 发布目标已达成！进入无尽模式，尽可能多刷分！');
+    showBattleHint('♾️ 无尽模式开启：继续清场、刷分、撑到最后');
+    Danmaku.showBatch('victory', 2);
+    Sound.play('victory');
+    return;
+  }
+
+  if (stability >= 100) {
     Game.state = 'won';
     showEndScreen(true);
   }
@@ -905,9 +1167,11 @@ function checkWinCondition() {
 
 // ========== 特殊 Bug 定时生成 ==========
 function spawnSpecialBugs() {
+  const spawnMultiplier = Enemy.getDifficultySpawnMultiplier();
+
   // 幽灵 Bug — 每 30 秒生成一个
   Game.ghostSpawnTimer++;
-  if (Game.ghostSpawnTimer >= Game.ghostInterval) {
+  if (Game.ghostSpawnTimer >= Math.floor(Game.ghostInterval * spawnMultiplier)) {
     Game.ghostSpawnTimer = 0;
     if (Enemy.countByType('ghost') < 2 && Enemy.count() < Enemy.maxAlive - 1) {
       Enemy.spawn('ghost');
@@ -919,7 +1183,7 @@ function spawnSpecialBugs() {
 
   // 死机 Bug — 每 40 秒生成一个
   Game.crashSpawnTimer++;
-  if (Game.crashSpawnTimer >= Game.crashInterval) {
+  if (Game.crashSpawnTimer >= Math.floor(Game.crashInterval * spawnMultiplier)) {
     Game.crashSpawnTimer = 0;
     if (Enemy.countByType('crash') < 2 && Enemy.count() < Enemy.maxAlive - 1) {
       Enemy.spawn('crash');
@@ -931,7 +1195,7 @@ function spawnSpecialBugs() {
 
   // P0 Bug — 每 60 秒生成一个
   Game.p0SpawnTimer++;
-  if (Game.p0SpawnTimer >= Game.p0Interval) {
+  if (Game.p0SpawnTimer >= Math.floor(Game.p0Interval * spawnMultiplier)) {
     Game.p0SpawnTimer = 0;
     if (Enemy.countByType('p0') < 1 && Enemy.count() < Enemy.maxAlive - 1) {
       Enemy.spawn('p0');
@@ -943,14 +1207,16 @@ function spawnSpecialBugs() {
 
   // Boss Bug — 默认每 60 秒尝试生成，条件不满足时 30 秒后重试
   Game.bossSpawnTimer++;
-  if (Game.bossSpawnTimer >= Game.bossInterval) {
+  if (Game.bossSpawnTimer >= Math.floor(Game.bossInterval * spawnMultiplier)) {
     if (Enemy.countByType('boss') < 1 && Enemy.count() < Enemy.maxAlive - 2) {
       // 条件满足 — 生成 Boss
       Game.bossSpawnTimer = 0;
       Effects.bossSpawn();
       Sound.play('bossSpawn');
 
-      setTimeout(() => {
+      clearBossSpawnTimer();
+      Game.pendingBossSpawnTimer = setTimeout(() => {
+        Game.pendingBossSpawnTimer = null;
         if (Game.state !== 'playing') return;
         Enemy.spawn('boss');
         Effects.banner('😈 Boss Bug 降临了！需要炸三次！小心它的邪笑！');
@@ -960,7 +1226,7 @@ function spawnSpecialBugs() {
       }, 1500);
     } else {
       // 条件不满足 — 保留一半进度，30 秒后重试
-      Game.bossSpawnTimer = Math.floor(Game.bossInterval / 2);
+      Game.bossSpawnTimer = Math.floor(Game.bossInterval * spawnMultiplier / 2);
     }
   }
 }
@@ -968,6 +1234,10 @@ function spawnSpecialBugs() {
 // ========== 结束界面 ==========
 
 function showEndScreen(won) {
+  clearBossSpawnTimer();
+  Effects.clearTransientTimers();
+  Sound.stopBgm();
+
   const screen = document.getElementById('end-screen');
   const title = document.getElementById('end-title');
   const message = document.getElementById('end-message');
@@ -981,8 +1251,11 @@ function showEndScreen(won) {
   const minutes = Math.floor(elapsed / 60);
   const seconds = elapsed % 60;
   const clearRate = Math.floor(GameMap.getClearRate() * 100);
-  const bugsKilled = Enemy.spawnCount - Enemy.count();
+  const bugsKilled = Math.max(0, Enemy.spawnCount - Enemy.count() - Enemy.selfDestructCount);
   const stability = getSystemStability();
+  const endlessSeconds = Game.endlessMode && Game.endlessStartTime
+    ? Math.max(0, Math.floor((performance.now() - Game.endlessStartTime) / 1000))
+    : 0;
   const worldName = RuleEngine.currentRules ? RuleEngine.currentRules.worldName : '未知';
   // 安全转义 — 防止 AI 返回恶意 HTML
   const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
@@ -990,7 +1263,7 @@ function showEndScreen(won) {
 
   // ========== 存档数据 ==========
   // 计算得分
-  const score = bugsKilled * 10 + clearRate + (stability / 2) + (won ? 1000 : 0);
+  const score = bugsKilled * 10 + clearRate + (stability / 2) + (won ? 1000 : 0) + (Game.endlessMode ? 500 + endlessSeconds * 5 : 0);
   // 保存记录
   const isNewBestScore = Storage.stats.setBestScore(Math.floor(score));
   const isNewBestCombo = Storage.stats.setBestCombo(Game.maxCombo);
@@ -1083,8 +1356,8 @@ function showEndScreen(won) {
     `;
   } else {
     const deathMsg = deathCauses[Math.floor(Math.random() * deathCauses.length)];
-    title.textContent = '\u{1F480} \u6D4B\u8BD5\u5DE5\u7A0B\u5E08\uFF0C\u5352';
-    title.style.color = '#f87171';
+    title.textContent = Game.endlessMode ? '♾️ 无尽终局' : '\u{1F480} \u6D4B\u8BD5\u5DE5\u7A0B\u5E08\uFF0C\u5352';
+    title.style.color = Game.endlessMode ? '#22d3ee' : '#f87171';
 
     // 失败复盘 — 分析死因
     const remainingBugs = Enemy.count();
@@ -1100,7 +1373,11 @@ function showEndScreen(won) {
       deathAnalysis = '\u8D70\u4F4D\u5931\u8BEF\uFF0C\u88AB\u81EA\u5DF1\u7684\u70B8\u5F39\u56F0\u4F4F\u4E86';
     }
 
-    message.innerHTML = `${deathMsg}<br>Bug 还在笑着。你的遗言是："这个Bug我复现不了..."`;
+    if (Game.endlessMode) {
+      message.innerHTML = `发布目标已完成，你在无尽模式又坚持了 ${endlessSeconds} 秒。<br>Bug 还在继续来，但这次你已经刷出了像样的成绩。`;
+    } else {
+      message.innerHTML = `${deathMsg}<br>Bug 还在笑着。你的遗言是："这个Bug我复现不了..."`;
+    }
 
     // 毒舌总结 — 适合截图传播
     const roastText = getDeathRoast({
@@ -1129,14 +1406,20 @@ function showEndScreen(won) {
         <div class="end-stat-value" style="color:#10B981">${stability}%</div>
         <div class="end-stat-label">系统稳定度</div>
       </div>
+      ${Game.endlessMode ? `
+      <div class="end-stat">
+        <div class="end-stat-value" style="color:#22d3ee">${endlessSeconds}s</div>
+        <div class="end-stat-label">无尽坚持</div>
+      </div>
+      ` : ''}
       <div style="width:100%;margin-top:12px;padding:12px;background:#0f172a;border-radius:8px;font-size:13px;color:#94a3b8;line-height:1.8;text-align:left;">
-        <div style="color:#f87171;font-weight:700;margin-bottom:6px;">🔍 故障复盘</div>
+        <div style="color:${Game.endlessMode ? '#22d3ee' : '#f87171'};font-weight:700;margin-bottom:6px;">${Game.endlessMode ? '♾️ 无尽复盘' : '🔍 故障复盘'}</div>
         死因：${deathAnalysis}<br>
         世界：${safeWorldName}<br>
         产品需求变更次数：${Game.productTriggers}<br>
         研发引入Bug次数：${Game.devTriggers}<br>
         剩余技术债：${remainingShishan} 块<br>
-        最终稳定度：${stability}%
+        最终稳定度：${stability}%${Game.endlessMode ? `<br>无尽阶段坚持：${endlessSeconds} 秒` : ''}
       </div>
       <div style="width:100%;margin-top:8px;padding:10px 14px;background:linear-gradient(135deg,#1a1a2e,#2a1a1e);border:1px solid #f87171;border-radius:8px;font-size:14px;color:#f87171;font-weight:600;text-align:center;">
         💬 ${roastText}
@@ -1163,10 +1446,25 @@ function showEndScreen(won) {
 // ========== 重新开始 ==========
 
 function restartGame() {
+  Game.compileRunId++;
+  clearCompileAnimationTimers();
+  clearBossSpawnTimer();
+  Effects.clearTransientTimers();
+  Sound.stopBgm();
+
   // 1. 隐藏所有界面，显示输入界面
   document.getElementById('end-screen').classList.remove('active');
   document.getElementById('input-screen').classList.add('active');
   document.getElementById('game-screen').classList.remove('active');
+
+  const pauseOverlay = document.getElementById('pause-overlay');
+  if (pauseOverlay) pauseOverlay.remove();
+  Game.isPaused = false;
+  Game.previousState = null;
+  Input.left = false;
+  Input.right = false;
+  Input.up = false;
+  Input.down = false;
 
   // 2. 重置输入和编译状态（双区设计）
   const input = document.getElementById('world-input');
@@ -1180,6 +1478,7 @@ function restartGame() {
   // 回到未编译状态
   showInputDimmedZone(false);
   showCompileResultZone(false);
+  renderPromptPreview('');
 
   // 3. 重置编译按钮状态
   setCompileControlsBusy(false, '编译世界');
@@ -1194,6 +1493,10 @@ function restartGame() {
   Game.state = 'input';
   Game.lastInput = '';
   Game.pendingRuleData = null;
+  Game.timeLimitFrames = 0;
+  Game.endlessMode = false;
+  Game.endlessStartTime = 0;
+  clearDirectionalInput();
 
   // 6. 重置规则引擎（不清空 currentRules，因为重新编译世界会重新应用）
   RuleEngine.resetConfig();
@@ -1206,8 +1509,11 @@ function restartGame() {
 
 window.addEventListener('DOMContentLoaded', () => {
   setupInput();
+  setupTouchControls();
   RuleEngine.init();
   restoreApiConfig();
+  applySavedSettings();
+  renderPromptPreview('');
 
   // 用户必须点击才能激活音频（浏览器限制）
   const startHint = document.getElementById('intro-start-hint');

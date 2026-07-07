@@ -73,7 +73,7 @@ body {
 .game-title {
   font-size: 52px;
   font-weight: 900;
-  background: linear-gradient(135deg, #4ade80 0%, #22d3ee 50%, #a78bfa 100%);
+  background: linear-gradient(135deg, #10B981 0%, #22d3ee 50%, #a78bfa 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -84,7 +84,7 @@ body {
 }
 
 @keyframes title-glow {
-  0% { filter: drop-shadow(0 0 10px rgba(74, 222, 128, 0.3)); }
+  0% { filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.3)); }
   100% { filter: drop-shadow(0 0 25px rgba(167, 139, 250, 0.5)); }
 }
 
@@ -549,6 +549,34 @@ body {
   }
 }
 
+@media (hover: none), (pointer: coarse) {
+  body {
+    overflow-y: auto;
+    align-items: flex-start;
+  }
+
+  #game-screen {
+    padding: 8px;
+  }
+
+  .canvas-container {
+    width: min(546px, 92vw);
+  }
+
+  #game-canvas {
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  .game-right {
+    width: min(546px, 92vw) !important;
+  }
+
+  .mobile-controls {
+    display: flex;
+  }
+}
+
 @media (max-height: 700px) {
   #game-screen {
     padding: 4px;
@@ -663,6 +691,61 @@ body {
 #game-canvas {
   display: block;
   background: #0F172A;
+}
+
+.mobile-controls {
+  display: none;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 2px 0;
+}
+
+.mobile-dpad {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobile-dpad-row {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.touch-btn {
+  width: 56px;
+  height: 56px;
+  border: 1px solid #334155;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.98));
+  color: #E2E8F0;
+  font-size: 22px;
+  font-weight: 700;
+  font-family: inherit;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.touch-btn:active,
+.touch-btn.is-active {
+  transform: scale(0.96);
+  border-color: #10B981;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.35);
+}
+
+.touch-center {
+  opacity: 0.35;
+}
+
+.touch-bomb-btn {
+  width: 112px;
+  font-size: 20px;
+  color: #F8FAFC;
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  border-color: rgba(251, 146, 60, 0.5);
 }
 
 /* ========== 横幅区域 ========== */

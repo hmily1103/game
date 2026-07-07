@@ -290,7 +290,7 @@ const Intro = {
     // 门牌 — "测试部"
     ctx.fillStyle = '#1e293b';
     ctx.fillRect(doorX + 15, doorY - 34, 70, 24);
-    ctx.fillStyle = '#4ade80';
+    ctx.fillStyle = '#10B981';
     ctx.font = 'bold 14px "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('测试部', doorX + 50, doorY - 17);
@@ -482,7 +482,7 @@ const Intro = {
 
     // === 胸牌 ===
     r(10, 22, 6, 5, '#fff');
-    ctx.fillStyle = '#4ade80';
+    ctx.fillStyle = '#10B981';
     ctx.font = `${Math.round(5 * s)}px "Courier New", monospace`;
     ctx.textAlign = 'center';
     ctx.fillText('QA', px + 13 * s, py + 26 * s);
@@ -550,7 +550,7 @@ const Intro = {
       // 终端文字 — 逐行显示
       ctx.font = '10px "Microsoft YaHei", sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillStyle = '#4ade80';
+      ctx.fillStyle = '#10B981';
       ctx.fillText('> BugBomber v1.0', monX + 10, monY + 20);
 
       if (this.screenBrightness > 0.3) {
@@ -563,7 +563,7 @@ const Intro = {
 
       // 闪烁光标
       if (this.globalFrame % 30 < 15) {
-        ctx.fillStyle = '#4ade80';
+        ctx.fillStyle = '#10B981';
         ctx.fillRect(monX + 10, monY + 44, 8, 2);
       }
 
@@ -572,7 +572,7 @@ const Intro = {
         const titleAlpha = (this.screenBrightness - 0.5) * 2;
         ctx.globalAlpha = titleAlpha;
         ctx.font = 'bold 20px "Microsoft YaHei", sans-serif';
-        ctx.fillStyle = '#4ade80';
+        ctx.fillStyle = '#10B981';
         ctx.textAlign = 'center';
         ctx.fillText('BugBomber', monX + monW / 2, monY + 80);
         ctx.font = '10px "Microsoft YaHei", sans-serif';

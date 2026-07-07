@@ -3,6 +3,17 @@
 const Sound = {
   ctx: null,
   enabled: true,
+  bgmActive: false,
+  bgmTimers: [],
+
+  setEnabled(enabled) {
+    this.enabled = !!enabled;
+    if (!this.enabled) {
+      this.stopBgm();
+    } else if (typeof Game !== 'undefined' && Game.state === 'playing') {
+      this.startBgm();
+    }
+  },
 
   init() {
     // 避免重复创建 AudioContext（浏览器有数量限制）
@@ -16,6 +27,74 @@ const Sound = {
       console.warn('Web Audio API 不可用');
       this.enabled = false;
     }
+  },
+
+  clearBgmTimers() {
+    for (const timerId of this.bgmTimers) {
+      clearTimeout(timerId);
+    }
+    this.bgmTimers = [];
+  },
+
+  queueBgmNote(freq, delayMs, duration, wave, volume) {
+    const timerId = setTimeout(() => {
+      this.bgmTimers = this.bgmTimers.filter(id => id !== timerId);
+      if (!this.enabled || !this.ctx || !this.bgmActive) return;
+
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = wave || 'triangle';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(volume || 0.035, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(this.ctx.currentTime);
+      osc.stop(this.ctx.currentTime + duration);
+    }, delayMs);
+    this.bgmTimers.push(timerId);
+  },
+
+  scheduleBgmLoop() {
+    if (!this.enabled || !this.ctx || !this.bgmActive) return;
+
+    const beatMs = 240;
+    const loopMs = beatMs * 16;
+    const bassLine = [130.81, 130.81, 164.81, 130.81, 174.61, 164.81, 130.81, 98.0];
+    const leadLine = [523.25, 659.25, 783.99, 659.25, 587.33, 659.25, 698.46, 783.99];
+
+    for (let i = 0; i < bassLine.length; i++) {
+      this.queueBgmNote(bassLine[i], i * beatMs * 2, 0.2, 'triangle', 0.03);
+      this.queueBgmNote(bassLine[i] / 2, i * beatMs * 2 + beatMs, 0.16, 'sine', 0.02);
+    }
+
+    for (let i = 0; i < leadLine.length; i++) {
+      this.queueBgmNote(leadLine[i], i * beatMs * 2 + beatMs, 0.12, 'square', 0.022);
+      if (i % 2 === 0) {
+        this.queueBgmNote(leadLine[i] * 0.5, i * beatMs * 2 + beatMs * 1.5, 0.08, 'square', 0.014);
+      }
+    }
+
+    const timerId = setTimeout(() => {
+      this.bgmTimers = this.bgmTimers.filter(id => id !== timerId);
+      if (!this.bgmActive) return;
+      this.scheduleBgmLoop();
+    }, loopMs);
+    this.bgmTimers.push(timerId);
+  },
+
+  startBgm() {
+    if (!this.enabled || !this.ctx || this.bgmActive) return;
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+    this.bgmActive = true;
+    this.scheduleBgmLoop();
+  },
+
+  stopBgm() {
+    this.bgmActive = false;
+    this.clearBgmTimers();
   },
 
   play(type) {

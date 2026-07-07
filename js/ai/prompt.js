@@ -15,6 +15,7 @@ const PromptTemplate = {
    - bug_speed: Bug速度倍率（0.5-2）
    - bomb_timer: 炸弹延迟（秒，1-4）
    - player_speed: 玩家速度倍率（0.8-2）
+   - time_pressure: 发布倒计时（秒，范围45-120）
 
 2. 机制规则（3条规则中至少1条必须是机制规则）：
    - bug_split: Bug被炸后分裂成2个（Bug越炸越多）

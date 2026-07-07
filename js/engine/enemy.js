@@ -8,6 +8,7 @@ const Enemy = {
   maxAlive: GameConfig.bugs.maxAlive, // 最大同时存活的 Bug 数，防止卡顿
   difficultyLevel: 1, // 当前难度等级
   difficultyTimer: 0, // 难度提升计时器
+  selfDestructCount: 0, // 死机 Bug 自爆数，不计入“玩家修复”
   // 各类型击杀统计
   killStats: { normal: 0, ghost: 0, crash: 0, p0: 0, boss: 0 },
 
@@ -59,6 +60,7 @@ const Enemy = {
     this.spawnCount = 0;
     this.difficultyLevel = 1;
     this.difficultyTimer = 0;
+    this.selfDestructCount = 0;
     this.killStats = { normal: 0, ghost: 0, crash: 0, p0: 0, boss: 0 };
     // 初始生成 3 个普通 Bug
     for (let i = 0; i < 3; i++) {
@@ -81,6 +83,10 @@ const Enemy = {
   // 获取当前难度下的速度倍数
   getDifficultySpeedMultiplier() {
     return 1 + (this.difficultyLevel - 1) * (GameConfig.difficulty.bugSpeedMultiplier - 1);
+  },
+
+  getDifficultySpawnMultiplier() {
+    return Math.pow(GameConfig.difficulty.spawnRateMultiplier, this.difficultyLevel - 1);
   },
 
   spawn(type, x, y) {
@@ -126,7 +132,11 @@ const Enemy = {
       targetY: pos.y * CELL_SIZE,
       moving: false,
       dir: Math.floor(Math.random() * 4),
-      speed: 1.5 * config.speed * RuleEngine.config.bugSpeed * this.getDifficultySpeedMultiplier(),
+      speed: 1.5
+        * config.speed
+        * RuleEngine.config.bugSpeed
+        * (Game.judgeBugSpeedMultiplier || 1)
+        * this.getDifficultySpeedMultiplier(),
       alive: true,
       health: config.health,
       // 幽灵虫
@@ -139,6 +149,8 @@ const Enemy = {
       splitOnDeath: RuleEngine.config.bugSplit,
       // 出生动画 — Boss 更长
       spawnAnim: type === 'boss' ? 30 : 15,
+      bossSummonTimer: config.boss ? 600 : 0,
+      bossShishanTimer: config.boss ? 900 : 0,
     };
     this.list.push(enemy);
     this.spawnCount++;
@@ -218,7 +230,8 @@ const Enemy = {
 
       // 多重爆炸
       for (let i = 0; i < 3; i++) {
-        setTimeout(() => {
+        Effects.scheduleTransient(() => {
+          if (Game.state !== 'playing' && Game.state !== 'won' && Game.state !== 'lost') return;
           Effects.explosion(e.gridX, e.gridY);
           Effects.shake();
         }, i * 150);
@@ -276,7 +289,7 @@ const Enemy = {
     } else {
       // 普通 Bug 击杀
       Effects.floatText(Danmaku.getKillFloat(), 
-        e.gridX * CELL_SIZE + CELL_SIZE/2, e.gridY * CELL_SIZE, '#4ade80');
+        e.gridX * CELL_SIZE + CELL_SIZE/2, e.gridY * CELL_SIZE, '#10B981');
       Danmaku.show('kill');
       Sound.play('kill');
 
@@ -348,6 +361,7 @@ const Enemy = {
           // 范围爆炸 — 3x3 范围
           e.alive = false;
           this.killStats.crash++;
+          this.selfDestructCount++;
           
           Effects.bigShake();
           Effects.explosion(e.gridX, e.gridY);
@@ -399,6 +413,51 @@ const Enemy = {
         } else {
           e.pixelX += Math.sign(dx) * e.speed;
           e.pixelY += Math.sign(dy) * e.speed;
+        }
+      }
+
+      if (e.type === 'boss') {
+        e.bossSummonTimer--;
+        if (e.bossSummonTimer <= 0) {
+          e.bossSummonTimer = 600;
+          const summonSlots = Math.min(2, this.maxAlive - this.count());
+          if (summonSlots > 0) {
+            const dirs = [[1,0],[-1,0],[0,1],[0,-1]].sort(() => Math.random() - 0.5);
+            let spawned = 0;
+            for (const [dx, dy] of dirs) {
+              if (spawned >= summonSlots) break;
+              const sx = e.gridX + dx;
+              const sy = e.gridY + dy;
+              const occupied = this.list.some(other => other.alive && other.id !== e.id && other.gridX === sx && other.gridY === sy);
+              if (!GameMap.isWalkable(sx, sy) || Bomb.isAt(sx, sy) || occupied || (Player.gridX === sx && Player.gridY === sy)) continue;
+              this.spawn('normal', sx, sy);
+              spawned++;
+            }
+            if (spawned > 0) {
+              Effects.floatText('📣 Boss 叫来了支援！',
+                e.gridX * CELL_SIZE + CELL_SIZE / 2, e.gridY * CELL_SIZE - 12, '#f59e0b');
+              Danmaku.show('dev');
+            }
+          }
+        }
+
+        e.bossShishanTimer--;
+        if (e.bossShishanTimer <= 0) {
+          e.bossShishanTimer = 900;
+          if (GameMap.countShishan() < GameMap.maxShishan) {
+            const dirs = [[0,0],[1,0],[-1,0],[0,1],[0,-1]].sort(() => Math.random() - 0.5);
+            for (const [dx, dy] of dirs) {
+              const sx = e.gridX + dx;
+              const sy = e.gridY + dy;
+              if (Player.gridX === sx && Player.gridY === sy) continue;
+              if (GameMap.respawnShishan(sx, sy)) {
+                Effects.particle(sx * CELL_SIZE + CELL_SIZE / 2, sy * CELL_SIZE + CELL_SIZE / 2, '#92400e');
+                Effects.floatText('🧱 Boss 又堆了新屎山',
+                  e.gridX * CELL_SIZE + CELL_SIZE / 2, e.gridY * CELL_SIZE + 8, '#f59e0b');
+                break;
+              }
+            }
+          }
         }
       }
 

@@ -80,7 +80,7 @@ const Pickup = {
       Player.lives = Math.min(5, Player.lives + type.heal);
       Effects.floatText(`\u{2764}\u{FE0F} +${type.heal}  \u{1F357}`, 
         pickup.gridX * CELL_SIZE + CELL_SIZE / 2, 
-        pickup.gridY * CELL_SIZE, '#4ade80');
+        pickup.gridY * CELL_SIZE, '#10B981');
       Danmaku.show('pickup');
       Sound.play('heal');
     } else if (type.effect === 'shield') {

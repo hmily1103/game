@@ -7,6 +7,7 @@ const Effects = {
   drumsticks: [],
   // 屎山飞射碎片队列 — 加速时炸屎山，碎片飞出屏幕
   flyingPoops: [],
+  transientTimers: [],
 
   // 随机搞笑横幅文案
   productBanners: [
@@ -34,6 +35,29 @@ const Effects = {
     '\u{1F7E2} \u7814\u53D1\uFF1A\u8FD9\u4E2A\u6539\u52A8\u5E94\u8BE5\u6CA1\u5F71\u54CD... \u5427\uFF1F',
     '\u{1F7E2} \u4E00\u884C\u4EE3\u7801\uFF0C\u4E09\u4E2ABug',
   ],
+
+  scheduleTransient(callback, delay) {
+    const timerId = setTimeout(() => {
+      this.transientTimers = this.transientTimers.filter(id => id !== timerId);
+      callback();
+    }, delay);
+    this.transientTimers.push(timerId);
+    return timerId;
+  },
+
+  clearTransientTimers() {
+    for (const timerId of this.transientTimers) {
+      clearTimeout(timerId);
+    }
+    this.transientTimers = [];
+  },
+
+  getCanvasCenter() {
+    return {
+      x: (GRID_SIZE * CELL_SIZE) / 2,
+      y: (GRID_SIZE * CELL_SIZE) / 2,
+    };
+  },
 
   shake() {
     const container = document.querySelector('.canvas-container');
@@ -66,7 +90,7 @@ const Effects = {
     div.className = 'banner';
     div.textContent = text;
     area.appendChild(div);
-    setTimeout(() => div.remove(), 2500);
+    this.scheduleTransient(() => div.remove(), 2500);
   },
 
   randomProductBanner() {
@@ -87,9 +111,9 @@ const Effects = {
     div.textContent = text;
     div.style.left = (x - 40) + 'px';
     div.style.top = (y - 10) + 'px';
-    div.style.color = color || '#4ade80';
+    div.style.color = color || '#10B981';
     container.appendChild(div);
-    setTimeout(() => div.remove(), 1200);
+    this.scheduleTransient(() => div.remove(), 1200);
   },
 
   // 屎山被炸飞时的特效 — 便便飞溅 + 绿色恶臭
@@ -153,7 +177,7 @@ const Effects = {
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed - 1,
         life: 45, maxLife: 45,
-        color: ['#84CC16', '#A3E635', '#65A30D', '#4ade80'][Math.floor(Math.random() * 4)],
+        color: ['#84CC16', '#A3E635', '#65A30D', '#10B981'][Math.floor(Math.random() * 4)],
       });
     }
 
@@ -357,7 +381,7 @@ const Effects = {
       const flash = document.createElement('div');
       flash.style.cssText = 'position:absolute;inset:0;background:rgba(220,38,38,0.4);pointer-events:none;z-index:100;animation:boss-flash 1.5s ease-out forwards;';
       container.appendChild(flash);
-      setTimeout(() => flash.remove(), 1500);
+      this.scheduleTransient(() => flash.remove(), 1500);
 
       // Boss 警告横幅
       const warnOverlay = document.createElement('div');
@@ -367,16 +391,17 @@ const Effects = {
         <div style="font-size:18px;color:#fbbf24;margin-top:8px;text-shadow:0 0 10px rgba(251,191,36,0.6);">Bug 降临中...</div>
       `;
       container.appendChild(warnOverlay);
-      setTimeout(() => warnOverlay.remove(), 1500);
+      this.scheduleTransient(() => warnOverlay.remove(), 1500);
     }
 
     // 全屏粒子风暴 — 红色 + 黑色
+    const center = this.getCanvasCenter();
     for (let i = 0; i < 40; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 3 + Math.random() * 6;
       this.particles.push({
-        x: 273 + (Math.random() - 0.5) * 100,
-        y: 273 + (Math.random() - 0.5) * 100,
+        x: center.x + (Math.random() - 0.5) * 100,
+        y: center.y + (Math.random() - 0.5) * 100,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         life: 60, maxLife: 60,
@@ -399,7 +424,24 @@ const Effects = {
     overlay.appendChild(banner);
 
     container.appendChild(overlay);
-    setTimeout(() => overlay.remove(), 3000);
+    this.scheduleTransient(() => overlay.remove(), 3000);
+  },
+
+  // ====== 继续游戏横幅 ======
+  unpauseBanner() {
+    const container = document.querySelector('.canvas-container');
+    if (!container) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'bug-wave-overlay';
+
+    const banner = document.createElement('div');
+    banner.className = 'bug-wave-banner';
+    banner.textContent = '▶️ 继续游戏！';
+    overlay.appendChild(banner);
+
+    container.appendChild(overlay);
+    this.scheduleTransient(() => overlay.remove(), 1500);
   },
 
   // 触发"一大波Bug"事件 — 生成多个Bug + 预警横幅 + 音效 + 屏幕震动
@@ -425,9 +467,10 @@ const Effects = {
     const waveCount = Math.min(2 + Math.floor(Math.random() * 3), remainingSlots);
     const bugTypes = ['normal', 'normal', 'normal', 'ghost', 'crash'];
 
-    setTimeout(() => {
+    this.scheduleTransient(() => {
+      if (Game.state !== 'playing') return;
       for (let i = 0; i < waveCount; i++) {
-        setTimeout(() => {
+        this.scheduleTransient(() => {
           if (Game.state !== 'playing') return;
           if (Enemy.count() >= Enemy.maxAlive) return;
           const type = bugTypes[Math.floor(Math.random() * bugTypes.length)];

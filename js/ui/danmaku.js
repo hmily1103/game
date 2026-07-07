@@ -182,7 +182,7 @@ const Danmaku = {
     div.style.top = Math.random() * 80 + 'px';
 
     const colors = [
-      '#4ade80', '#fbbf24', '#60a5fa', '#f87171',
+      '#10B981', '#fbbf24', '#60a5fa', '#f87171',
       '#e879f9', '#22d3ee', '#a78bfa', '#fb923c',
     ];
     div.style.color = colors[Math.floor(Math.random() * colors.length)];

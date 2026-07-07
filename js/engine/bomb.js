@@ -107,7 +107,7 @@ const Bomb = {
           const killed = Enemy.killAt(fx, fy);
           if (killed) {
             Effects.explosion(fx, fy);
-            Effects.floatText(Danmaku.getKillFloat(), fx * CELL_SIZE + CELL_SIZE / 2, fy * CELL_SIZE, '#4ade80');
+            Effects.floatText(Danmaku.getKillFloat(), fx * CELL_SIZE + CELL_SIZE / 2, fy * CELL_SIZE, '#10B981');
             Danmaku.show('kill');
             Sound.play('kill');
             Roast.trigger('killBug');

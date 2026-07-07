@@ -10,7 +10,7 @@ const DeveloperSystem = {
     this.interval = RuleEngine.config.devSpawnDelay;
     this.spawnPerCycle = RuleEngine.config.devSpawnCount;
     // 第一次触发为完整间隔，给玩家适应时间
-    this.timer = this.interval * 60;
+    this.timer = Math.round(this.interval * 60 * Enemy.getDifficultySpawnMultiplier());
     this.active = true;
   },
 
@@ -21,7 +21,7 @@ const DeveloperSystem = {
     this.timer--;
     if (this.timer <= 0) {
       this.trigger();
-      this.timer = this.interval * 60;
+      this.timer = Math.round(this.interval * 60 * Enemy.getDifficultySpawnMultiplier());
     }
   },
 
@@ -56,6 +56,6 @@ const DeveloperSystem = {
     Characters.devAction(devLines[Math.floor(Math.random() * devLines.length)]);
 
     // 下次触发加随机抖动 — 更像"系统失控"而非定时器
-    this.timer = (this.interval + (Math.random() - 0.5) * 4) * 60;
+    this.timer = Math.round((this.interval + (Math.random() - 0.5) * 4) * 60 * Enemy.getDifficultySpawnMultiplier());
   },
 };

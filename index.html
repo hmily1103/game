@@ -23,7 +23,7 @@
     <div id="intro-screen" class="screen active">
       <canvas id="intro-canvas" width="600" height="480"></canvas>
       <div id="intro-start-hint" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;z-index:10;cursor:pointer;">
-        <div style="font-size:18px;color:#4ade80;font-family:'Courier New',monospace;text-shadow:0 0 10px rgba(74,222,128,0.5);margin-bottom:8px;">▶ 点击开始</div>
+        <div style="font-size:18px;color:#10B981;font-family:'Courier New',monospace;text-shadow:0 0 10px rgba(16,185,129,0.5);margin-bottom:8px;">▶ 点击开始</div>
         <div style="font-size:11px;color:#64748b;font-family:'Courier New',monospace;">需点击激活音效</div>
       </div>
     </div>
@@ -66,6 +66,14 @@
           <div class="compile-success">
             <span class="compile-success-icon">✅</span>
             <span id="compile-status-text">世界编译完成</span>
+          </div>
+          <div style="margin:10px 0 8px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button id="sound-toggle-btn" class="btn-secondary" type="button" onclick="toggleSoundSetting()">🔊 音频：开</button>
+            <button id="prompt-toggle-btn" class="btn-secondary" type="button" onclick="togglePromptPreview()">查看 Prompt</button>
+          </div>
+          <div id="prompt-preview-box" style="display:none;margin-bottom:12px;padding:12px;border:1px solid #334155;border-radius:10px;background:#0f172a;">
+            <div style="font-size:12px;color:#94a3b8;margin-bottom:8px;">发送给 AI 的 Prompt 预览</div>
+            <pre id="prompt-preview-content" style="margin:0;white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.6;color:#cbd5e1;font-family:'Courier New',monospace;"></pre>
           </div>
           <div id="compile-rule-preview" class="compile-rule-preview"></div>
           <div class="compile-result-actions">
@@ -145,6 +153,10 @@
               <span class="hud-icon">📊</span>
               <span id="stability-hud">稳定度 50%</span>
             </div>
+            <div class="hud-item hud-secondary" id="hud-timer" style="display:none;">
+              <span class="hud-icon">⏰</span>
+              <span id="timer-hud">倒计时 60s</span>
+            </div>
             <div class="hud-item" id="speed-hud" style="display:none;">
               <span class="hud-icon">⚡</span>
               <span id="speed-timer">10</span>
@@ -181,6 +193,22 @@
               <div class="char-desk"></div>
               <div class="char-label">研发</div>
             </div>
+          </div>
+          <div id="mobile-controls" class="mobile-controls">
+            <div class="mobile-dpad">
+              <div class="mobile-dpad-row">
+                <button class="touch-btn touch-dir-btn" data-touch-dir="up" type="button">▲</button>
+              </div>
+              <div class="mobile-dpad-row">
+                <button class="touch-btn touch-dir-btn" data-touch-dir="left" type="button">◀</button>
+                <button class="touch-btn touch-dir-btn touch-center" type="button" disabled>•</button>
+                <button class="touch-btn touch-dir-btn" data-touch-dir="right" type="button">▶</button>
+              </div>
+              <div class="mobile-dpad-row">
+                <button class="touch-btn touch-dir-btn" data-touch-dir="down" type="button">▼</button>
+              </div>
+            </div>
+            <button id="touch-bomb-btn" class="touch-btn touch-bomb-btn" type="button">💣 爆破</button>
           </div>
           <div id="banner-area"></div>
           <div id="battle-hint" class="battle-hint"></div>
@@ -244,7 +272,6 @@
   <script src="js/engine/pickup.js"></script>
   <script src="js/engine/bomb.js"></script>
   <script src="js/engine/enemy.js"></script>
-  <script src="js/engine/collision.js"></script>
   <script src="js/systems/product.js"></script>
   <script src="js/systems/developer.js"></script>
   <script src="js/systems/shishan.js"></script>

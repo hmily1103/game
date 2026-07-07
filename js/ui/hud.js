@@ -5,6 +5,7 @@ const HUD = {
     const lives = document.getElementById('lives');
     const bugCount = document.getElementById('bug-count');
     const clearRate = document.getElementById('clear-rate');
+    const timerHud = document.getElementById('timer-hud');
 
     if (lives) {
       lives.textContent = Player.lives;
@@ -46,6 +47,27 @@ const HUD = {
         clearRate.style.color = '#fbbf24';
       } else {
         clearRate.style.color = '#94a3b8';
+      }
+    }
+
+    if (timerHud) {
+      if (Game.timeLimitFrames > 0) {
+        const seconds = getRemainingTimeSeconds();
+        timerHud.style.display = '';
+        timerHud.textContent = '倒计时 ' + seconds + 's';
+        if (seconds <= 10) {
+          timerHud.style.color = '#ef4444';
+          timerHud.classList.add('heart-critical');
+        } else if (seconds <= 20) {
+          timerHud.style.color = '#f59e0b';
+          timerHud.classList.remove('heart-critical');
+        } else {
+          timerHud.style.color = '#e2e8f0';
+          timerHud.classList.remove('heart-critical');
+        }
+      } else {
+        timerHud.style.display = 'none';
+        timerHud.classList.remove('heart-critical');
       }
     }
 

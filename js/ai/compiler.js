@@ -57,7 +57,7 @@ const Compiler = {
       }
 
       const data = await response.json();
-      const content = data.choices[0].message.content;
+      const content = this.extractContent(data);
 
       // 尝试提取 JSON
       const jsonStr = this.extractJson(content);
@@ -76,10 +76,23 @@ const Compiler = {
     } catch (err) {
       console.warn('[Compiler] AI 调用失败，降级到离线兜底:', err.message);
       const fallback = FallbackRules.match(input);
-      fallback.source = '本地兜底（AI 降级）';
+      fallback.source = fallback.isHidden ? (fallback.source || '隐藏规则 ✨') : '本地兜底（AI 降级）';
       fallback.rawJson = '';
       return fallback;
     }
+  },
+
+  extractContent(data) {
+    const content = data
+      && data.choices
+      && data.choices[0]
+      && data.choices[0].message
+      && data.choices[0].message.content;
+
+    if (typeof content !== 'string' || !content.trim()) {
+      throw new Error('API 返回内容为空或结构不兼容');
+    }
+    return content;
   },
 
   extractJson(text) {
@@ -87,10 +100,53 @@ const Compiler = {
     const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (codeBlockMatch) return codeBlockMatch[1].trim();
 
-    // 尝试直接找 JSON 对象
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) return jsonMatch[0];
+    // 尝试扫描第一个完整 JSON 对象，避免贪婪匹配吞掉多段文本
+    const jsonObject = this.findFirstJsonObject(text);
+    if (jsonObject) return jsonObject;
 
     return text;
+  },
+
+  findFirstJsonObject(text) {
+    let start = -1;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (ch === '\\') {
+          escaped = true;
+        } else if (ch === '"') {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (ch === '"') {
+        inString = true;
+        continue;
+      }
+
+      if (ch === '{') {
+        if (depth === 0) start = i;
+        depth++;
+        continue;
+      }
+
+      if (ch === '}') {
+        if (depth === 0) continue;
+        depth--;
+        if (depth === 0 && start !== -1) {
+          return text.slice(start, i + 1);
+        }
+      }
+    }
+
+    return null;
   },
 };
